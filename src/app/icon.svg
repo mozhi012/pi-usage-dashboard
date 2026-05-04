@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#1a1a2e"/>
+  <text x="16" y="22" text-anchor="middle" font-family="monospace" font-size="18" font-weight="bold" fill="#e8a838">π</text>
+  <rect x="5" y="25" width="4" height="3" rx="1" fill="#6366f1" opacity="0.8"/>
+  <rect x="10" y="23" width="4" height="5" rx="1" fill="#8b5cf6" opacity="0.8"/>
+  <rect x="15" y="21" width="4" height="7" rx="1" fill="#a78bfa" opacity="0.8"/>
+  <rect x="20" y="18" width="4" height="10" rx="1" fill="#c4b5fd" opacity="0.8"/>
+</svg>
