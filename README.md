@@ -33,7 +33,7 @@ A web-based dashboard for tracking token usage, costs, sessions, and resources a
 ### Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/pi-usage-dashboard.git
+git clone https://github.com/mralifakbar/pi-usage-dashboard.git
 cd pi-usage-dashboard
 npm install
 npm run build
