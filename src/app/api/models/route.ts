@@ -6,13 +6,18 @@
  * - OAuth-authenticated built-in providers from ~/.pi/agent/auth.json
  * - pi --list-models CLI output
  *
- * GET /api/models
+ * GET    /api/models                — List all models and providers
+ * POST   /api/models                — Add a provider or model
+ * PUT    /api/models                — Update a provider or model
+ * DELETE /api/models?provider=x     — Delete a provider
+ * DELETE /api/models?provider=x&modelId=y — Delete a model
  */
-import { NextResponse } from "next/server";
-import { readFile, access } from "fs/promises";
+import { NextRequest, NextResponse } from "next/server";
+import { readFile, writeFile, access } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
 import { exec } from "child_process";
+import { requireMutationAuth } from "@/lib/api-security";
 
 interface ModelInfo {
   id: string;
@@ -23,6 +28,7 @@ interface ModelInfo {
   reasoning?: boolean;
   images?: boolean;
   cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  source?: "custom" | "builtin" | "cli";
 }
 
 interface ProviderInfo {
@@ -32,18 +38,27 @@ interface ProviderInfo {
   hasAuth: boolean;
   authType: "api_key" | "oauth" | "none";
   modelCount: number;
+  source?: "custom" | "builtin" | "cli";
+  hasApiKey?: boolean;
 }
+
+const MODELS_JSON_PATH = join(homedir(), ".pi", "agent", "models.json");
+const SETTINGS_PATH = join(homedir(), ".pi", "agent", "settings.json");
+const AUTH_PATH = join(homedir(), ".pi", "agent", "auth.json");
 
 async function exists(path: string): Promise<boolean> {
   try { await access(path); return true; } catch { return false; }
 }
 
-/**
- * Locate the built-in models.generated.js from pi's installation.
- * Resolves the path dynamically using `which pi` to find the install location.
- */
+function parseSize(str: string): number {
+  if (!str) return 0;
+  const cleaned = str.replace(/,/g, "");
+  if (cleaned.endsWith("M")) return parseFloat(cleaned) * 1_000_000;
+  if (cleaned.endsWith("K")) return parseFloat(cleaned) * 1_000;
+  return parseInt(cleaned, 10) || 0;
+}
+
 async function findBuiltInModelsPath(): Promise<string> {
-  // Try to resolve via `which pi` → follow symlinks to find package root
   try {
     const piPath = await new Promise<string>((resolve, reject) => {
       exec("which pi", (err, stdout) => {
@@ -51,11 +66,8 @@ async function findBuiltInModelsPath(): Promise<string> {
         else resolve(stdout.trim());
       });
     });
-
-    // Follow the path: bin/pi -> ../lib/node_modules/@mariozechner/pi-coding-agent
     const { realpathSync } = await import("fs");
     const realPiPath = realpathSync(piPath);
-    // Go up from bin to package root
     const parts = realPiPath.split("/");
     const binIdx = parts.lastIndexOf("bin");
     if (binIdx > 0) {
@@ -63,28 +75,21 @@ async function findBuiltInModelsPath(): Promise<string> {
       const candidate = join(prefix, "lib", "node_modules", "@mariozechner", "pi-coding-agent", "node_modules", "@mariozechner", "pi-ai", "dist", "models.generated.js");
       if (await exists(candidate)) return candidate;
     }
-
-    // Try relative to the real path of the pi binary
     const pkgDir = join(realPiPath, "..", "..");
     const candidate2 = join(pkgDir, "node_modules", "@mariozechner", "pi-ai", "dist", "models.generated.js");
     if (await exists(candidate2)) return candidate2;
-  } catch {
-    // which pi failed
-  }
+  } catch { /* skip */ }
 
-  // Fallback: common global npm locations
   const home = homedir();
   const candidates = [
     join(home, ".npm-global", "lib", "node_modules", "@mariozechner", "pi-coding-agent", "node_modules", "@mariozechner", "pi-ai", "dist", "models.generated.js"),
     "/usr/local/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-ai/dist/models.generated.js",
     "/usr/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-ai/dist/models.generated.js",
   ];
-
   for (const c of candidates) {
     if (await exists(c)) return c;
   }
-
-  return ""; // Not found
+  return "";
 }
 
 export async function GET() {
@@ -93,19 +98,15 @@ export async function GET() {
     const modelsJsonPath = join(home, ".pi", "agent", "models.json");
     const settingsPath = join(home, ".pi", "agent", "settings.json");
     const authPath = join(home, ".pi", "agent", "auth.json");
-    // Try to find the built-in models file from pi's installation
-    // Works regardless of how pi was installed (npm global, nvm, volta, etc.)
     const builtInModelsPath = await findBuiltInModelsPath();
 
     const models: ModelInfo[] = [];
     const providers: Record<string, ProviderInfo> = {};
 
-    // 1. Read auth.json to know which providers are authenticated
+    // 1. Read auth.json
     let authData: Record<string, { type: string; [key: string]: unknown }> = {};
     if (await exists(authPath)) {
-      try {
-        authData = JSON.parse(await readFile(authPath, "utf-8"));
-      } catch { /* skip */ }
+      try { authData = JSON.parse(await readFile(authPath, "utf-8")); } catch { /* skip */ }
     }
 
     // 2. Read custom providers from models.json
@@ -141,6 +142,8 @@ export async function GET() {
             hasAuth: hasApiKey || hasOAuth,
             authType: hasOAuth ? "oauth" : hasApiKey ? "api_key" : "none",
             modelCount: cfg.models?.length || 0,
+            source: "custom",
+            hasApiKey,
           };
 
           if (cfg.models) {
@@ -154,6 +157,7 @@ export async function GET() {
                 reasoning: model.reasoning || false,
                 images: model.input?.includes("image") || false,
                 cost: model.cost,
+                source: "custom",
               });
             }
           }
@@ -161,30 +165,23 @@ export async function GET() {
       } catch { /* skip */ }
     }
 
-    // 3. Load built-in models from pi-ai (only for authenticated providers)
+    // 3. Load built-in models from pi-ai
     if (builtInModelsPath && await exists(builtInModelsPath)) {
       try {
         const content = await readFile(builtInModelsPath, "utf-8");
-        // Extract model data from the JS module
-        // The file exports an object with provider keys containing model objects
-        // We'll parse it by extracting the JSON-like data
-
-        // Find all provider/model entries using regex on the compiled JS
         const modelRegex = /id:\s*"([^"]+)",\s*name:\s*"([^"]+)",\s*api:\s*"([^"]+)",\s*provider:\s*"([^"]+)",\s*baseUrl:\s*"([^"]*)"[^}]*?reasoning:\s*(true|false)[^}]*?input:\s*\[([^\]]*)\][^}]*?cost:\s*\{[^}]*?input:\s*([\d.]+)[^}]*?output:\s*([\d.]+)[^}]*?cacheRead:\s*([\d.]+)[^}]*?cacheWrite:\s*([\d.]+)[^}]*?\}[^}]*?contextWindow:\s*(\d+)[^}]*?maxTokens:\s*(\d+)/g;
 
         let match;
         while ((match = modelRegex.exec(content)) !== null) {
           const [, id, name, , provider, , reasoning, input, costIn, costOut, cacheRead, cacheWrite, contextWindow, maxTokens] = match;
 
-          // Only include if provider is authenticated
-          const providerAuthKey = provider; // e.g., "google", "anthropic", "openai"
+          const providerAuthKey = provider;
           const isAuthenticated = !!authData[providerAuthKey] ||
             !!authData[`${providerAuthKey}-gemini-cli`] ||
-            !!providers[providerAuthKey]; // already in custom providers
+            !!providers[providerAuthKey];
 
           if (!isAuthenticated) continue;
 
-          // Skip if already added from models.json
           const existing = models.find(m => m.provider === provider && m.id === id);
           if (existing) continue;
 
@@ -197,6 +194,7 @@ export async function GET() {
               hasAuth: !!authEntry,
               authType: authEntry?.type === "oauth" ? "oauth" : authEntry ? "api_key" : "none",
               modelCount: 0,
+              source: "builtin",
             };
           }
 
@@ -214,12 +212,13 @@ export async function GET() {
               cacheRead: parseFloat(cacheRead) || 0,
               cacheWrite: parseFloat(cacheWrite) || 0,
             },
+            source: "builtin",
           });
         }
       } catch { /* skip */ }
     }
 
-    // 4. Also try pi --list-models for any models we missed
+    // 4. Try pi --list-models
     try {
       const output = await new Promise<string>((resolve, reject) => {
         exec("pi --list-models 2>&1", { timeout: 10000 }, (error, stdout) => {
@@ -234,7 +233,6 @@ export async function GET() {
         const parts = line.trim().split(/\s+/);
         if (parts.length >= 6) {
           const [provider, modelId, context, maxOut, thinking, images] = parts;
-          const key = `${provider}/${modelId}`;
           const existing = models.find(m => m.provider === provider && m.id === modelId);
           if (existing) continue;
 
@@ -246,6 +244,7 @@ export async function GET() {
               hasAuth: true,
               authType: "api_key",
               modelCount: 0,
+              source: "cli",
             };
           }
 
@@ -257,6 +256,7 @@ export async function GET() {
             maxTokens: parseSize(maxOut),
             reasoning: thinking === "yes",
             images: images === "yes",
+            source: "cli",
           });
         }
       }
@@ -278,7 +278,6 @@ export async function GET() {
       } catch { /* skip */ }
     }
 
-    // Auth summary
     const authProviders = Object.entries(authData).map(([key, val]) => ({
       id: key,
       type: val.type as string,
@@ -301,10 +300,217 @@ export async function GET() {
   }
 }
 
-function parseSize(str: string): number {
-  if (!str) return 0;
-  const cleaned = str.replace(/,/g, "");
-  if (cleaned.endsWith("M")) return parseFloat(cleaned) * 1_000_000;
-  if (cleaned.endsWith("K")) return parseFloat(cleaned) * 1_000;
-  return parseInt(cleaned, 10) || 0;
+/** Read and parse the models.json file, returning the providers object. */
+async function readModelsJson(): Promise<Record<string, any>> {
+  if (!(await exists(MODELS_JSON_PATH))) return {};
+  try {
+    const content = await readFile(MODELS_JSON_PATH, "utf-8");
+    const parsed = JSON.parse(content);
+    return parsed.providers || {};
+  } catch {
+    return {};
+  }
+}
+
+/** Write the providers object back to models.json, preserving other top-level keys. */
+async function writeModelsJson(providers: Record<string, any>): Promise<void> {
+  let existing: Record<string, any> = { providers: {} };
+  if (await exists(MODELS_JSON_PATH)) {
+    try {
+      existing = JSON.parse(await readFile(MODELS_JSON_PATH, "utf-8"));
+    } catch { /* ignore */ }
+  }
+  existing.providers = providers;
+  await writeFile(MODELS_JSON_PATH, JSON.stringify(existing, null, 2) + "\n");
+}
+
+export async function POST(request: NextRequest) {
+  const authError = await requireMutationAuth(request);
+  if (authError) return authError;
+
+  try {
+    const body = await request.json();
+    const { action } = body;
+
+    if (!action || typeof action !== "string") {
+      return NextResponse.json({ error: "action is required" }, { status: 400 });
+    }
+
+    const providers = await readModelsJson();
+
+    if (action === "add-provider") {
+      const { name, baseUrl, api, apiKey } = body;
+      if (!name || typeof name !== "string") {
+        return NextResponse.json({ error: "name is required" }, { status: 400 });
+      }
+      if (!baseUrl || typeof baseUrl !== "string") {
+        return NextResponse.json({ error: "baseUrl is required" }, { status: 400 });
+      }
+      if (!api || typeof api !== "string") {
+        return NextResponse.json({ error: "api is required" }, { status: 400 });
+      }
+      if (providers[name]) {
+        return NextResponse.json({ error: `Provider "${name}" already exists` }, { status: 409 });
+      }
+      providers[name] = {
+        baseUrl,
+        api,
+        models: [],
+      };
+      if (apiKey && typeof apiKey === "string" && apiKey.length > 0) {
+        providers[name].apiKey = apiKey;
+      }
+      await writeModelsJson(providers);
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "add-model") {
+      const { provider, model } = body;
+      if (!provider || typeof provider !== "string") {
+        return NextResponse.json({ error: "provider is required" }, { status: 400 });
+      }
+      if (!model || !model.id || typeof model.id !== "string") {
+        return NextResponse.json({ error: "model.id is required" }, { status: 400 });
+      }
+      if (!providers[provider]) {
+        return NextResponse.json({ error: `Provider "${provider}" not found` }, { status: 404 });
+      }
+      if (providers[provider].models?.find((m: any) => m.id === model.id)) {
+        return NextResponse.json({ error: `Model "${model.id}" already exists in provider "${provider}"` }, { status: 409 });
+      }
+      providers[provider].models = providers[provider].models || [];
+      // Only keep known fields
+      providers[provider].models.push({
+        id: model.id,
+        name: model.name || model.id,
+        contextWindow: model.contextWindow ?? 0,
+        maxTokens: model.maxTokens ?? 0,
+        ...(model.reasoning !== undefined && { reasoning: !!model.reasoning }),
+        ...(model.input !== undefined && { input: model.input }),
+        ...(model.cost !== undefined && { cost: model.cost }),
+      });
+      await writeModelsJson(providers);
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to update models", details: String(error) },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  const authError = await requireMutationAuth(request);
+  if (authError) return authError;
+
+  try {
+    const body = await request.json();
+    const { action } = body;
+
+    if (!action || typeof action !== "string") {
+      return NextResponse.json({ error: "action is required" }, { status: 400 });
+    }
+
+    const providers = await readModelsJson();
+
+    if (action === "update-provider") {
+      const { name, baseUrl, api, apiKey } = body;
+      if (!name || typeof name !== "string") {
+        return NextResponse.json({ error: "name is required" }, { status: 400 });
+      }
+      if (!providers[name]) {
+        return NextResponse.json({ error: `Provider "${name}" not found` }, { status: 404 });
+      }
+      if (baseUrl !== undefined) providers[name].baseUrl = baseUrl;
+      if (api !== undefined) providers[name].api = api;
+      if (apiKey !== undefined) {
+        if (apiKey === "") {
+          delete providers[name].apiKey;
+        } else {
+          providers[name].apiKey = apiKey;
+        }
+      }
+      await writeModelsJson(providers);
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "update-model") {
+      const { provider, modelId, updates } = body;
+      if (!provider || typeof provider !== "string") {
+        return NextResponse.json({ error: "provider is required" }, { status: 400 });
+      }
+      if (!modelId || typeof modelId !== "string") {
+        return NextResponse.json({ error: "modelId is required" }, { status: 400 });
+      }
+      if (!providers[provider]) {
+        return NextResponse.json({ error: `Provider "${provider}" not found` }, { status: 404 });
+      }
+      const modelIdx = providers[provider].models?.findIndex((m: any) => m.id === modelId);
+      if (modelIdx === undefined || modelIdx < 0) {
+        return NextResponse.json({ error: `Model "${modelId}" not found in provider "${provider}"` }, { status: 404 });
+      }
+      const existing = providers[provider].models[modelIdx];
+      if (updates.id !== undefined && typeof updates.id === "string") existing.id = updates.id;
+      if (updates.name !== undefined) existing.name = updates.name;
+      if (updates.contextWindow !== undefined) existing.contextWindow = updates.contextWindow;
+      if (updates.maxTokens !== undefined) existing.maxTokens = updates.maxTokens;
+      if (updates.reasoning !== undefined) existing.reasoning = !!updates.reasoning;
+      if (updates.input !== undefined) existing.input = updates.input;
+      if (updates.cost !== undefined) existing.cost = updates.cost;
+      await writeModelsJson(providers);
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to update models", details: String(error) },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const authError = await requireMutationAuth(request);
+  if (authError) return authError;
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const provider = searchParams.get("provider");
+    const modelId = searchParams.get("modelId");
+
+    if (!provider) {
+      return NextResponse.json({ error: "provider query param is required" }, { status: 400 });
+    }
+
+    const providers = await readModelsJson();
+
+    if (!providers[provider]) {
+      return NextResponse.json({ error: `Provider "${provider}" not found` }, { status: 404 });
+    }
+
+    if (modelId) {
+      // Delete a specific model
+      const modelIdx = providers[provider].models?.findIndex((m: any) => m.id === modelId);
+      if (modelIdx === undefined || modelIdx < 0) {
+        return NextResponse.json({ error: `Model "${modelId}" not found` }, { status: 404 });
+      }
+      providers[provider].models.splice(modelIdx, 1);
+      await writeModelsJson(providers);
+      return NextResponse.json({ success: true, message: `Deleted model "${modelId}" from "${provider}"` });
+    } else {
+      // Delete the entire provider
+      delete providers[provider];
+      await writeModelsJson(providers);
+      return NextResponse.json({ success: true, message: `Deleted provider "${provider}"` });
+    }
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to delete", details: String(error) },
+      { status: 500 }
+    );
+  }
 }
