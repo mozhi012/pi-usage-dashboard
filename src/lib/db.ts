@@ -7,7 +7,7 @@
 import Database from "better-sqlite3";
 import { join } from "path";
 import { homedir } from "os";
-import { mkdirSync } from "fs";
+import { existsSync, mkdirSync, readFileSync } from "fs";
 
 const DB_DIR = join(homedir(), ".pi", "agent");
 const DB_PATH = join(DB_DIR, "usage-dashboard.db");
@@ -52,6 +52,8 @@ export interface ModelPricing {
   cacheReadPrice: number;  // per 1M tokens
   cacheWritePrice: number; // per 1M tokens
   updatedAt: string;
+  /** Where this pricing entry originated */
+  source?: "manual" | "models.json";
 }
 
 export function getAllPricing(): ModelPricing[] {
@@ -74,6 +76,7 @@ export function getAllPricing(): ModelPricing[] {
     cacheReadPrice: r.cache_read_price,
     cacheWritePrice: r.cache_write_price,
     updatedAt: r.updated_at,
+    source: "manual" as const,
   }));
 }
 
@@ -125,12 +128,77 @@ export function deletePricing(model: string): void {
   db.prepare("DELETE FROM model_pricing WHERE model = ?").run(model);
 }
 
+/**
+ * Load cost data embedded in model definitions from ~/.pi/agent/models.json.
+ * Only returns entries for models that have a `cost` field with at least one
+ * non-zero price. These act as automatic fallback pricing.
+ */
+function loadModelsJsonCosts(): ModelPricing[] {
+  const modelsJsonPath = join(homedir(), ".pi", "agent", "models.json");
+  if (!existsSync(modelsJsonPath)) return [];
+
+  try {
+    const content = readFileSync(modelsJsonPath, "utf-8");
+    const parsed = JSON.parse(content);
+    const providers = parsed.providers || {};
+    const result: ModelPricing[] = [];
+
+    for (const config of Object.values(providers)) {
+      const cfg = config as {
+        models?: Array<{
+          id: string;
+          cost?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
+        }>;
+      };
+      if (!cfg.models) continue;
+
+      for (const model of cfg.models) {
+        if (!model.cost) continue;
+        const c = model.cost;
+        if (!c.input && !c.output && !c.cacheRead && !c.cacheWrite) continue;
+
+        result.push({
+          model: model.id,
+          inputPrice: c.input || 0,
+          outputPrice: c.output || 0,
+          cacheReadPrice: c.cacheRead || 0,
+          cacheWritePrice: c.cacheWrite || 0,
+          updatedAt: new Date(0).toISOString(), // epoch — signals "from models.json"
+          source: "models.json",
+        });
+      }
+    }
+
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Get the complete pricing map used for cost calculations.
+ *
+ * Priority (highest first):
+ * 1. Manual pricing from SQLite (set in /pricing page)
+ * 2. Auto costs from models.json (model definitions)
+ *
+ * A model in SQLite always wins over the same model in models.json.
+ */
 export function getPricingMap(): Map<string, ModelPricing> {
-  const all = getAllPricing();
   const map = new Map<string, ModelPricing>();
-  for (const p of all) {
+
+  // Layer 1: costs embedded in models.json (lower priority)
+  for (const p of loadModelsJsonCosts()) {
+    if (!map.has(p.model)) {
+      map.set(p.model, p);
+    }
+  }
+
+  // Layer 2: manual pricing from SQLite (overrides models.json)
+  for (const p of getAllPricing()) {
     map.set(p.model, p);
   }
+
   return map;
 }
 
