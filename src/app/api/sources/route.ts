@@ -18,7 +18,9 @@ import {
   deleteSessionSource,
 } from "@/lib/db";
 import { access, stat } from "fs/promises";
+import { homedir } from "os";
 import { requireMutationAuth } from "@/lib/api-security";
+import { expandHome } from "@/lib/path-security";
 
 export async function GET() {
   try {
@@ -32,12 +34,14 @@ export async function GET() {
 }
 
 async function validateSourcePath(path: string): Promise<NextResponse | null> {
+  // Expand ~/ prefix to full home directory path before stat check
+  const resolvedPath = expandHome(path, homedir());
   try {
-    const stats = await stat(path);
+    const stats = await stat(resolvedPath);
     if (!stats.isDirectory()) {
       return NextResponse.json({ error: `Path is not a directory: ${path}` }, { status: 400 });
     }
-    await access(path);
+    await access(resolvedPath);
     return null;
   } catch {
     return NextResponse.json(

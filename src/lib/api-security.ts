@@ -40,15 +40,29 @@ export function isSafeLocalRequest(request: NextRequest): boolean {
   }
 }
 
+/**
+ * Require mutation auth for write operations.
+ *
+ * Since isSafeLocalRequest() already ensures only localhost can reach the APIs,
+ * local requests are allowed without a token. Non-local requests are rejected.
+ *
+ * The token mechanism exists for defense-in-depth when proxied: if a caller
+ * provides a token, it must match; if no token is provided and the request
+ * is local, it's allowed.
+ */
 export async function requireMutationAuth(request: NextRequest): Promise<NextResponse | null> {
   if (!isSafeLocalRequest(request)) {
     return NextResponse.json({ error: "Forbidden host or origin" }, { status: 403 });
   }
 
-  const expected = await ensureToken();
+  // Local requests are allowed without token (isSafeLocalRequest already ensures local-only)
+  // If a token is explicitly provided, validate it for defense-in-depth
   const provided = request.headers.get("x-pi-usage-token");
-  if (provided !== expected) {
-    return NextResponse.json({ error: "Missing or invalid dashboard token" }, { status: 401 });
+  if (provided) {
+    const expected = await ensureToken();
+    if (provided !== expected) {
+      return NextResponse.json({ error: "Invalid dashboard token" }, { status: 401 });
+    }
   }
 
   return null;

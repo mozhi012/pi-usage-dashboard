@@ -65,6 +65,7 @@ export default function PricingPage() {
     cacheReadPrice: "",
     cacheWritePrice: "",
   });
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const fetchPricing = useCallback(async () => {
     const res = await fetch("/api/pricing");
@@ -87,7 +88,8 @@ export default function PricingPage() {
   }, [fetchPricing, fetchUsage]);
 
   const handleSave = async (model: string) => {
-    await fetch("/api/pricing", {
+    setSaveError(null);
+    const res = await fetch("/api/pricing", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -98,6 +100,11 @@ export default function PricingPage() {
         cacheWritePrice: parseFloat(formData.cacheWritePrice) || 0,
       }),
     });
+    const data = await res.json();
+    if (!res.ok) {
+      setSaveError(data.error || "Failed to save pricing");
+      return;
+    }
     setEditModel(null);
     setIsAddOpen(false);
     setNewModel("");
@@ -107,14 +114,21 @@ export default function PricingPage() {
       cacheReadPrice: "",
       cacheWritePrice: "",
     });
+    setSaveError(null);
     await fetchPricing();
     await fetchUsage();
   };
 
   const handleDelete = async (model: string) => {
-    await fetch(`/api/pricing?model=${encodeURIComponent(model)}`, {
+    setSaveError(null);
+    const res = await fetch(`/api/pricing?model=${encodeURIComponent(model)}`, {
       method: "DELETE",
     });
+    if (!res.ok) {
+      const data = await res.json();
+      setSaveError(data.error || "Failed to delete pricing");
+      return;
+    }
     await fetchPricing();
     await fetchUsage();
   };
@@ -223,6 +237,11 @@ export default function PricingPage() {
                     estimatedCost={newModel ? estimateCost(newModel) : null}
                     usage={newModel ? modelUsage[newModel] : undefined}
                   />
+                  {saveError && (
+                    <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                      {saveError}
+                    </div>
+                  )}
                   <div className="flex justify-end gap-2 pt-2">
                     <DialogClose>
                       <Button variant="outline">Cancel</Button>
@@ -339,6 +358,11 @@ export default function PricingPage() {
                                   estimatedCost={estimateCost(p.model)}
                                   usage={modelUsage[p.model]}
                                 />
+                                {saveError && (
+                                  <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                                    {saveError}
+                                  </div>
+                                )}
                                 <div className="flex justify-end gap-2 pt-2">
                                   <DialogClose>
                                     <Button variant="outline">Cancel</Button>

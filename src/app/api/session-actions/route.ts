@@ -14,7 +14,7 @@ import { homedir, tmpdir } from "os";
 import { randomUUID } from "crypto";
 import { requireMutationAuth } from "@/lib/api-security";
 import { execFileAsync } from "@/lib/command";
-import { resolveAllowedSessionFile } from "@/lib/session-paths";
+import { resolveAllowedSessionFile, getDefaultSessionsDir } from "@/lib/session-paths";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const authError = await requireMutationAuth(request);
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
 
       case "import": {
-        const sessionsDir = join(homedir(), ".pi", "agent", "sessions");
+        const sessionsDir = getDefaultSessionsDir();
         const content = await readFile(safeSessionFile, "utf-8");
         const firstLine = content.split("\n")[0];
         let targetDir = join(sessionsDir, "--imported--");

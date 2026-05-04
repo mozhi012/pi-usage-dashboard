@@ -91,13 +91,12 @@ export function SessionsTable({ sessions }: Props) {
   const handleAction = async (action: "resume" | "fork") => {
     if (!selectedSession) return;
     setLaunching(true);
+    setActionResult(null);
 
-    const cwd = selectedSession.project.startsWith("~")
-      ? selectedSession.project
-      : selectedSession.project;
+    const cwd = selectedSession.project;
 
     try {
-      await fetch("/api/terminal", {
+      const res = await fetch("/api/terminal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -107,9 +106,19 @@ export function SessionsTable({ sessions }: Props) {
           action,
         }),
       });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setActionResult({ type: "error", message: data.error || "Failed to launch terminal" });
+        return;
+      }
+
+      setSelectedSession(null);
+    } catch (err) {
+      setActionResult({ type: "error", message: String(err) });
     } finally {
       setLaunching(false);
-      setSelectedSession(null);
     }
   };
 
@@ -239,15 +248,18 @@ export function SessionsTable({ sessions }: Props) {
       <Dialog
         open={!!selectedSession}
         onOpenChange={(open) => {
-          if (!open) setSelectedSession(null);
+          if (!open) {
+            setSelectedSession(null);
+            setActionResult(null);
+          }
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Session Actions</DialogTitle>
           </DialogHeader>
           {selectedSession && (
-            <div className="space-y-4 pt-2">
+            <div className="space-y-4 pt-2 max-h-[70vh] overflow-y-auto">
               {/* Session info */}
               <div className="rounded-md bg-muted/50 p-4 space-y-2">
                 <div className="flex items-center justify-between">

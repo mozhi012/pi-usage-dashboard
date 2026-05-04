@@ -124,7 +124,12 @@ export interface AggregatedData {
 
 function shortenProject(project: string): string {
   const home = homedir();
-  if (project.startsWith(home)) {
+  // Must match home exactly or followed by a path separator to avoid
+  // false positives (e.g. home="/Users/john", project="/Users/johnson/proj")
+  if (project === home) {
+    return "~";
+  }
+  if (project.startsWith(home + "/") || project.startsWith(home + "\\")) {
     return "~" + project.slice(home.length);
   }
   return project;

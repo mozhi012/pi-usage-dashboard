@@ -98,21 +98,32 @@ function ProjectContent() {
 
   const projectStats = data?.byProject[project];
 
+  const [terminalError, setTerminalError] = useState<string | null>(null);
+
   const handleOpenTerminal = async (
     action?: "resume" | "fork",
     sessionId?: string,
     sessionFile?: string
   ) => {
-    await fetch("/api/terminal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        cwd: project,
-        sessionId,
-        sessionFile,
-        action,
-      }),
-    });
+    setTerminalError(null);
+    try {
+      const res = await fetch("/api/terminal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cwd: project,
+          sessionId,
+          sessionFile,
+          action,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTerminalError(data.error || "Failed to launch terminal");
+      }
+    } catch (err) {
+      setTerminalError(String(err));
+    }
   };
 
   if (!project) {
@@ -211,6 +222,12 @@ function ProjectContent() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {terminalError && (
+          <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+            {terminalError}
           </div>
         )}
 
