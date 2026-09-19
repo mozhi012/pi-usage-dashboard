@@ -8,21 +8,24 @@
  * DELETE /api/extensions { path, type }
  */
 import { NextRequest, NextResponse } from "next/server";
-import { readdir, readFile, access, rm, stat } from "fs/promises";
-import { join, basename } from "path";
+import { readdir, access, rm, stat } from "fs/promises";
+import type { Dirent } from "fs";
+import { join, basename, resolve } from "path";
 import { homedir } from "os";
 import { exec } from "child_process";
 import { requireMutationAuth } from "@/lib/api-security";
 import { resolveContainedPath } from "@/lib/path-security";
-
-interface ResourceItem {
-  name: string;
-  type: "extension" | "skill" | "prompt" | "theme";
-  scope: "global" | "package";
-  path: string;
-  description?: string;
-  packageName?: string;
-}
+import {
+  type ResourceItem,
+  type Warnings,
+  warn,
+  scanExtensionsDir,
+  scanSkills,
+  scanPrompts,
+  scanThemes,
+  scanPackage,
+  scanNpmNodeModules,
+} from "@/lib/extension-resources";
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -31,177 +34,6 @@ async function exists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-async function scanExtensions(dir: string, scope: "global" | "package", packageName?: string): Promise<ResourceItem[]> {
-  const items: ResourceItem[] = [];
-  if (!(await exists(dir))) return items;
-
-  try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.name.startsWith(".")) continue;
-      const fullPath = join(dir, entry.name);
-
-      if (entry.isFile() && entry.name.endsWith(".ts")) {
-        items.push({
-          name: entry.name.replace(/\.ts$/, ""),
-          type: "extension",
-          scope,
-          path: fullPath,
-          packageName,
-        });
-      } else if (entry.isDirectory()) {
-        const indexPath = join(fullPath, "index.ts");
-        if (await exists(indexPath)) {
-          items.push({
-            name: entry.name,
-            type: "extension",
-            scope,
-            path: fullPath,
-            packageName,
-          });
-        }
-      }
-    }
-  } catch {
-    // skip
-  }
-  return items;
-}
-
-async function scanSkills(dir: string, scope: "global" | "package", packageName?: string): Promise<ResourceItem[]> {
-  const items: ResourceItem[] = [];
-  if (!(await exists(dir))) return items;
-
-  try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-      const skillPath = join(dir, entry.name);
-      const skillFile = join(skillPath, "SKILL.md");
-
-      if (await exists(skillFile)) {
-        let description = "";
-        try {
-          const content = await readFile(skillFile, "utf-8");
-          // Parse YAML frontmatter description
-          const match = content.match(/description:\s*["']?(.+?)["']?\s*[\n-]/);
-          if (match) description = match[1].trim().slice(0, 120);
-        } catch {
-          // skip
-        }
-
-        items.push({
-          name: entry.name,
-          type: "skill",
-          scope,
-          path: skillPath,
-          description,
-          packageName,
-        });
-      }
-    }
-  } catch {
-    // skip
-  }
-  return items;
-}
-
-async function scanPrompts(dir: string, scope: "global" | "package", packageName?: string): Promise<ResourceItem[]> {
-  const items: ResourceItem[] = [];
-  if (!(await exists(dir))) return items;
-
-  try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.name.startsWith(".")) continue;
-      if (entry.isFile() && entry.name.endsWith(".md")) {
-        items.push({
-          name: entry.name.replace(/\.md$/, ""),
-          type: "prompt",
-          scope,
-          path: join(dir, entry.name),
-          packageName,
-        });
-      }
-    }
-  } catch {
-    // skip
-  }
-  return items;
-}
-
-async function scanThemes(dir: string, scope: "global" | "package", packageName?: string): Promise<ResourceItem[]> {
-  const items: ResourceItem[] = [];
-  if (!(await exists(dir))) return items;
-
-  try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.name.startsWith(".")) continue;
-      if (entry.isFile() && (entry.name.endsWith(".json") || entry.name.endsWith(".ts"))) {
-        items.push({
-          name: entry.name.replace(/\.(json|ts)$/, ""),
-          type: "theme",
-          scope,
-          path: join(dir, entry.name),
-          packageName,
-        });
-      }
-    }
-  } catch {
-    // skip
-  }
-  return items;
-}
-
-async function scanPackages(packagesDir: string): Promise<ResourceItem[]> {
-  const items: ResourceItem[] = [];
-  if (!(await exists(packagesDir))) return items;
-
-  try {
-    const entries = await readdir(packagesDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-      const pkgDir = join(packagesDir, entry.name);
-      const pkgJsonPath = join(pkgDir, "package.json");
-      const pkgName = entry.name;
-
-      let piConfig: { extensions?: string[]; skills?: string[]; prompts?: string[]; themes?: string[] } = {};
-
-      if (await exists(pkgJsonPath)) {
-        try {
-          const pkgJson = JSON.parse(await readFile(pkgJsonPath, "utf-8"));
-          piConfig = pkgJson.pi || {};
-        } catch {
-          // skip
-        }
-      }
-
-      // Scan configured or conventional dirs
-      const extDirs = piConfig.extensions || ["./extensions"];
-      const skillDirs = piConfig.skills || ["./skills"];
-      const promptDirs = piConfig.prompts || ["./prompts"];
-      const themeDirs = piConfig.themes || ["./themes"];
-
-      for (const d of extDirs) {
-        items.push(...await scanExtensions(join(pkgDir, d), "package", pkgName));
-      }
-      for (const d of skillDirs) {
-        items.push(...await scanSkills(join(pkgDir, d), "package", pkgName));
-      }
-      for (const d of promptDirs) {
-        items.push(...await scanPrompts(join(pkgDir, d), "package", pkgName));
-      }
-      for (const d of themeDirs) {
-        items.push(...await scanThemes(join(pkgDir, d), "package", pkgName));
-      }
-    }
-  } catch {
-    // skip
-  }
-  return items;
 }
 
 /**
@@ -238,67 +70,63 @@ export async function GET() {
     const piDir = join(home, ".pi", "agent");
     const agentsDir = join(home, ".agents");
 
+    const warnings: Warnings = [];
     const items: ResourceItem[] = [];
 
     // Global pi resources
-    items.push(...await scanExtensions(join(piDir, "extensions"), "global"));
-    items.push(...await scanSkills(join(piDir, "skills"), "global"));
-    items.push(...await scanSkills(join(agentsDir, "skills"), "global"));
-    items.push(...await scanPrompts(join(piDir, "prompts"), "global"));
-    items.push(...await scanThemes(join(piDir, "themes"), "global"));
+    items.push(...(await scanExtensionsDir(join(piDir, "extensions"), "global", undefined, warnings)));
+    items.push(...(await scanSkills(join(piDir, "skills"), "global", undefined, warnings)));
+    items.push(...(await scanSkills(join(agentsDir, "skills"), "global", undefined, warnings)));
+    items.push(...(await scanPrompts(join(piDir, "prompts"), "global", undefined, warnings)));
+    items.push(...(await scanThemes(join(piDir, "themes"), "global", undefined, warnings)));
 
     // Installed packages (git)
-    items.push(...await scanPackages(join(piDir, "git")));
-
-    // Installed packages (npm global) — resolve dynamically
-    const npmGlobalDir = await findNpmGlobalDir();
-    if (npmGlobalDir && await exists(npmGlobalDir)) {
+    const gitDir = join(piDir, "git");
+    if (await exists(gitDir)) {
+      let gitEntries: Dirent[];
       try {
-        const npmEntries = await readdir(npmGlobalDir, { withFileTypes: true });
-        for (const entry of npmEntries) {
-          if (!entry.isDirectory()) continue;
-          const pkgDir = join(npmGlobalDir, entry.name);
-
-          if (entry.name.startsWith("@")) {
-            const scopedEntries = await readdir(pkgDir, { withFileTypes: true });
-            for (const scoped of scopedEntries) {
-              if (!scoped.isDirectory()) continue;
-              const scopedPkgDir = join(pkgDir, scoped.name);
-              const pkgJsonPath = join(scopedPkgDir, "package.json");
-              if (await exists(pkgJsonPath)) {
-                try {
-                  const pkgJson = JSON.parse(await readFile(pkgJsonPath, "utf-8"));
-                  if (pkgJson.pi || pkgJson.keywords?.includes("pi-package")) {
-                    items.push(...await scanPackages(join(scopedPkgDir, "..")));
-                  }
-                } catch { /* skip */ }
-              }
-            }
-          } else {
-            const pkgJsonPath = join(pkgDir, "package.json");
-            if (await exists(pkgJsonPath)) {
-              try {
-                const pkgJson = JSON.parse(await readFile(pkgJsonPath, "utf-8"));
-                if (pkgJson.pi || pkgJson.keywords?.includes("pi-package")) {
-                  const piConfig = pkgJson.pi || {};
-                  const extDirs = piConfig.extensions || ["./extensions"];
-                  const skillDirs = piConfig.skills || ["./skills"];
-                  const promptDirs = piConfig.prompts || ["./prompts"];
-                  const themeDirs = piConfig.themes || ["./themes"];
-
-                  for (const d of extDirs) items.push(...await scanExtensions(join(pkgDir, d), "package", basename(pkgDir)));
-                  for (const d of skillDirs) items.push(...await scanSkills(join(pkgDir, d), "package", basename(pkgDir)));
-                  for (const d of promptDirs) items.push(...await scanPrompts(join(pkgDir, d), "package", basename(pkgDir)));
-                  for (const d of themeDirs) items.push(...await scanThemes(join(pkgDir, d), "package", basename(pkgDir)));
-                }
-              } catch { /* skip */ }
-            }
-          }
-        }
-      } catch { /* skip */ }
+        gitEntries = await readdir(gitDir, { withFileTypes: true });
+      } catch (err) {
+        warn(warnings, `cannot read ${gitDir}: ${String(err)}`);
+        gitEntries = [];
+      }
+      for (const entry of gitEntries) {
+        if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+        items.push(...(await scanPackage(join(gitDir, entry.name), "package", warnings)));
+      }
     }
 
-    return NextResponse.json(items);
+    // Installed packages (pi user-level npm: ~/.pi/agent/npm/node_modules)
+    const piNpmDir = join(piDir, "npm", "node_modules");
+    items.push(...(await scanNpmNodeModules(piNpmDir, warnings)));
+
+    // Installed packages (system npm global) — resolve dynamically. Skip when
+    // it is the same directory as the pi npm root (avoids a double scan).
+    const npmGlobalDir = await findNpmGlobalDir();
+    const norm = (p: string) => {
+      const absolute = resolve(p);
+      return process.platform === "win32" ? absolute.toLowerCase() : absolute;
+    };
+    if (
+      npmGlobalDir &&
+      norm(npmGlobalDir) !== norm(piNpmDir) &&
+      (await exists(npmGlobalDir))
+    ) {
+      items.push(...(await scanNpmNodeModules(npmGlobalDir, warnings)));
+    }
+
+    // Deduplicate by type + case-normalized absolute path (Windows paths are
+    // case-insensitive; a package could appear in more than one location).
+    const seen = new Set<string>();
+    const unique: ResourceItem[] = [];
+    for (const item of items) {
+      const key = `${item.type}:${norm(item.path)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(item);
+    }
+
+    return NextResponse.json(unique);
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to scan resources", details: String(error) },

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolve } from "path";
 import { isPathInside, hasJsonlExtension, expandHome } from "./path-security";
 
 describe("path-security", () => {
@@ -16,7 +17,7 @@ describe("path-security", () => {
   });
 
   it("expands a leading home marker only", () => {
-    expect(expandHome("~/sessions", "/home/me")).toBe("/home/me/sessions");
+    expect(expandHome("~/sessions", "/home/me")).toBe(resolve("/home/me", "sessions"));
     expect(expandHome("/tmp/~not-home", "/home/me")).toBe("/tmp/~not-home");
   });
 });
