@@ -98,7 +98,7 @@ pi-usage restart
 | 路由 | 说明 |
 |------|------|
 | `/` | 仪表盘主页 — 统计卡片、时间趋势图、模型分布图、各项目明细、全部会话列表 |
-| `/models` | 模型与提供商管理 — 显示所有模型、提供商以及 `auth.json` 认证状态，支持添加自定义模型 |
+| `/models` | 模型与提供商管理 — 显示所有模型、提供商以及 `auth.json` 认证状态，支持添加自定义模型；眼睛图标可纳入/排除 Pi 的模型选择范围（`enabledModels`）。范围非硬禁用：被排除模型在 Pi“全部模型”列表中仍可见，重启 Pi 进程后生效，项目级/`--models` 可覆盖 |
 | `/hotkeys` | 快捷键参考 — 展示默认快捷键与自定义键位映射 |
 | `/extensions` | 扩展与技能 — 浏览已安装的扩展、技能、提示词模板与主题（支持删除操作） |
 | `/settings` | 数据源设置 — 配置附加的会话日志扫描目录 |
@@ -113,7 +113,7 @@ pi-usage restart
 | `/api/usage/stream` | GET | SSE 实时数据流，文件发生变化时即时推送 |
 | `/api/pricing` | GET/POST/DELETE | 模型定价的增删改查 |
 | `/api/sources` | GET/POST/PUT/DELETE | 会话数据源目录管理 |
-| `/api/models` | GET | 获取可用模型与提供商（仅限已配置/已认证） |
+| `/api/models` | GET/POST/PUT/DELETE | 模型与提供商管理；PUT `action=set-model-scope` 纳入/排除模型选择范围，`action=reset-model-scope` 移除 `enabledModels` 限制 |
 | `/api/extensions` | GET/DELETE | 获取及删除扩展、技能、提示词和主题 |
 | `/api/hotkeys` | GET | 获取键盘快捷键与自定义覆盖项 |
 | `/api/terminal` | POST | 在新终端窗口中唤起并打开 Pi（支持跨平台） |
@@ -129,6 +129,7 @@ pi-usage restart
 | `~/.pi/agent/sessions/` | 默认 Pi 会话存储目录（只读读取） |
 | `~/.pi/agent/auth.json` | OAuth 及 API 凭据配置（只读读取） |
 | `~/.pi/agent/models.json` | 自定义提供商与模型配置（读写） |
+| `~/.pi/agent/settings.json` | 仅读写其中的 `enabledModels` 字段（模型选择范围），原子保存 |
 | `~/.pi/agent/keybindings.json` | 自定义键盘快捷键配置（只读读取） |
 
 ## 工作原理

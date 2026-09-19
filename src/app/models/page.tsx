@@ -38,6 +38,8 @@ import {
   Trash2,
   Save,
   AlertTriangle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -51,6 +53,9 @@ interface ModelInfo {
   images?: boolean;
   cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
   source?: "custom" | "builtin" | "cli";
+  inScope: boolean;
+  /** Whether pi can actually use this model right now (per pi --list-models). */
+  available: boolean;
 }
 
 interface ProviderInfo {
@@ -77,6 +82,8 @@ interface ModelsData {
   defaultModel: string;
   totalModels: number;
   totalProviders: number;
+  scope: { active: boolean; patterns: string[]; fallback?: boolean; readError?: string };
+  catalogOk: boolean;
 }
 
 interface ModelFormData {
@@ -149,6 +156,10 @@ export default function ModelsPage() {
   const [modelForm, setModelForm] = useState<ModelFormData>(DEFAULT_MODEL_FORM);
   const [modelSaving, setModelSaving] = useState(false);
   const [modelError, setModelError] = useState<string | null>(null);
+
+  // Model scope (enabledModels) state — a single busy flag so concurrent
+  // toggle/reset/refresh actions can never interleave.
+  const [scopeBusy, setScopeBusy] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -372,6 +383,118 @@ export default function ModelsPage() {
     }
   };
 
+  // --- Model scope (Pi enabledModels) ---
+
+  const scopeSettingsBroken = !!data?.scope?.readError;
+  const scopeCatalogOk = data?.catalogOk ?? true;
+  // Toggles need both a readable settings.json and a successful CLI catalog;
+  // reset only needs readable settings (it does not depend on the CLI).
+  const scopeToggleDisabled = scopeBusy || scopeSettingsBroken || !scopeCatalogOk;
+
+  /** Apply a refreshed payload returned by scope mutations, or refetch. */
+  const applyScopeResult = async (responseData: ModelsData | null) => {
+    if (responseData && Array.isArray(responseData.models)) {
+      setData(responseData);
+    } else {
+      await fetchData();
+    }
+  };
+
+  const handleToggleScope = async (model: ModelInfo) => {
+    if (scopeBusy || !data || scopeSettingsBroken || !scopeCatalogOk || !model.available) return;
+
+    if (model.inScope) {
+      const isDefault = model.id === data.defaultModel && model.provider === data.defaultProvider;
+      let msg = `将模型 "${model.provider}/${model.id}" 排除出 Pi 的模型选择范围？\n\n`;
+      msg += "排除后，Pi 的 /model 默认列表与 Ctrl+P 轮换将不再包含该模型；";
+      msg += "切换到“全部模型”时仍可见，且模型配置不会被删除。";
+      msg += data.scope?.active
+        ? "\n\n当前已启用范围限制：若该模型被通配规则覆盖，相关规则会展开为其余模型的明确列表。"
+        : "\n\n当前尚未启用范围限制：本次操作会写入一份明确的模型列表。";
+      msg += "展开通配规则后，未来 Pi 新增的模型可能需要手动纳入。";
+      if (isDefault) msg += "\n\n该模型是当前启动默认模型，排除后启动默认不变。";
+      msg += "\n\n重启 Pi 进程后生效；项目级 enabledModels/--models 会覆盖全局设置。";
+      if (!confirm(msg)) return;
+    }
+
+    setError(null);
+    setScopeBusy(true);
+    try {
+      const res = await fetch("/api/models", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "set-model-scope",
+          provider: model.provider,
+          modelId: model.id,
+          inScope: !model.inScope,
+        }),
+      });
+      const responseData = await res.json();
+      if (!res.ok) {
+        setError(responseData.error || "更新模型范围失败");
+        return;
+      }
+      await applyScopeResult(responseData);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setScopeBusy(false);
+    }
+  };
+
+  const handleResetScope = async () => {
+    if (scopeBusy || scopeSettingsBroken) return;
+    if (!confirm("移除所有模型范围限制（settings.json 的 enabledModels）？\nPi 默认模型列表将恢复显示所有模型，重启 Pi 进程后生效。")) return;
+    setError(null);
+    setScopeBusy(true);
+    try {
+      const res = await fetch("/api/models", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset-model-scope" }),
+      });
+      const responseData = await res.json();
+      if (!res.ok) {
+        setError(responseData.error || "移除范围限制失败");
+        return;
+      }
+      await applyScopeResult(responseData);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setScopeBusy(false);
+    }
+  };
+
+  /** Eye / EyeOff toggle for the selection scope, shared by both tables. */
+  const renderScopeToggle = (model: ModelInfo) => {
+    const unavailable = !model.available;
+    const title = unavailable
+      ? `模型当前不可用（无凭据或未在 pi 目录中），完成认证后才可设置范围：${model.provider}/${model.id}`
+      : model.inScope
+        ? `排除出模型选择范围：${model.provider}/${model.id}`
+        : `纳入模型选择范围：${model.provider}/${model.id}`;
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={scopeToggleDisabled || unavailable}
+        aria-label={title}
+        title={title}
+        onClick={() => handleToggleScope(model)}
+        className={model.inScope ? "" : "text-chart-5"}
+      >
+        {model.inScope ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+      </Button>
+    );
+  };
+
+  const renderExcludedBadge = (model: ModelInfo) =>
+    !model.inScope ? (
+      <Badge variant="secondary" className="ml-1.5 text-xs">已排除</Badge>
+    ) : null;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b border-border">
@@ -389,7 +512,7 @@ export default function ModelsPage() {
                   模型与提供商
                 </h1>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  管理自定义提供商与模型（支持编辑自定义项，内置模型为只读）
+                  管理自定义提供商与模型（支持编辑自定义项，内置模型为只读；眼睛图标可纳入/排除 Pi 模型选择范围）
                 </p>
               </div>
             </div>
@@ -400,7 +523,7 @@ export default function ModelsPage() {
               </Button>
               <Button
                 onClick={fetchData}
-                disabled={loading}
+                disabled={loading || scopeBusy}
                 variant="outline"
                 className="gap-1.5"
               >
@@ -494,6 +617,70 @@ export default function ModelsPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Model selection scope (enabledModels) */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  模型选择范围
+                  <span className="text-sm font-normal text-muted-foreground">(~/.pi/agent/settings.json 的 enabledModels)</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  范围只影响 Pi 会话中 <span className="font-mono">/model</span> 的默认列表与 Ctrl+P 轮换；
+                  这是选择范围而非彻底禁用，被排除的模型在“全部模型”列表中仍可见。重启 Pi 进程后生效；
+                  项目级 <span className="font-mono">enabledModels</span>/<span className="font-mono">--models</span> 会覆盖全局设置。
+                </p>
+                {data.scope?.readError && (
+                  <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                    {data.scope.readError}
+                  </div>
+                )}
+                {!data.catalogOk && (
+                  <div className="rounded-md bg-yellow-500/10 border border-yellow-500/20 p-3 text-sm text-yellow-600">
+                    pi --list-models 目录获取失败：当前范围状态仅为只读预览，可能不准确；
+                    为避免用不完整目录覆盖范围，暂时不能修改选择范围。
+                  </div>
+                )}
+                {data.scope?.fallback && (
+                  <div className="rounded-md bg-yellow-500/10 border border-yellow-500/20 p-3 text-sm text-yellow-600">
+                    enabledModels 存在配置但没有匹配到任何可用模型，Pi 会回退为显示全部模型。
+                  </div>
+                )}
+                {data.scope?.active ? (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {data.scope.patterns.map((p) => (
+                        <Badge key={p} variant="outline" className="text-xs font-mono gap-1.5 py-1 px-2.5">
+                          {p}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-xs"
+                        disabled={scopeBusy || scopeSettingsBroken}
+                        onClick={handleResetScope}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        恢复不限范围
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        当前模型范围内的模型共 {data.models.filter((m) => m.inScope).length}/{data.totalModels} 个
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    未启用范围限制，Pi 默认模型列表显示所有模型。排除任意模型后会写入明确列表。
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
             <Tabs defaultValue="providers">
               <TabsList>
@@ -593,17 +780,18 @@ export default function ModelsPage() {
                               <TableHead className="text-right">最大输出</TableHead>
                               <TableHead className="text-right">单价 ($/1M)</TableHead>
                               <TableHead className="text-center">特性</TableHead>
-                              {isCustom && <TableHead className="text-right w-20">操作</TableHead>}
+                              <TableHead className="text-right w-24">操作</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {providerModels.map((model) => (
-                              <TableRow key={`${name}/${model.id}`}>
+                              <TableRow key={`${name}/${model.id}`} className={model.inScope ? "" : "opacity-60"}>
                                 <TableCell className="font-mono text-sm">
                                   {model.id}
                                   {model.id === data.defaultModel && model.provider === data.defaultProvider && (
                                     <Star className="h-3 w-3 inline ml-1.5 text-chart-5" />
                                   )}
+                                  {renderExcludedBadge(model)}
                                 </TableCell>
                                 <TableCell className="text-sm text-muted-foreground">
                                   {model.name !== model.id ? model.name : "—"}
@@ -628,23 +816,26 @@ export default function ModelsPage() {
                                     )}
                                   </div>
                                 </TableCell>
-                                {isCustom && (
-                                  <TableCell className="text-right">
-                                    <div className="flex justify-end gap-1">
-                                      <Button variant="ghost" size="sm" onClick={() => openEditModel(model)}>
-                                        <Pencil className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleDeleteModel(name, model.id)}
-                                        className="text-destructive hover:text-destructive"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                )}
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-1">
+                                    {renderScopeToggle(model)}
+                                    {model.source === "custom" && (
+                                      <>
+                                        <Button variant="ghost" size="sm" onClick={() => openEditModel(model)}>
+                                          <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleDeleteModel(name, model.id)}
+                                          className="text-destructive hover:text-destructive"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -700,7 +891,7 @@ export default function ModelsPage() {
                       </TableHeader>
                       <TableBody>
                         {filteredModels.map((model) => (
-                          <TableRow key={`${model.provider}/${model.id}`}>
+                          <TableRow key={`${model.provider}/${model.id}`} className={model.inScope ? "" : "opacity-60"}>
                             <TableCell>
                               {model.source === "custom" ? (
                                 <Badge variant="outline" className="text-xs text-chart-2 border-chart-2/30">自定义</Badge>
@@ -718,6 +909,7 @@ export default function ModelsPage() {
                               {model.id === data.defaultModel && model.provider === data.defaultProvider && (
                                 <Star className="h-3 w-3 inline ml-1.5 text-chart-5" />
                               )}
+                              {renderExcludedBadge(model)}
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm">{formatSize(model.contextWindow)}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{formatSize(model.maxTokens)}</TableCell>
@@ -733,23 +925,24 @@ export default function ModelsPage() {
                               {model.images ? <Image className="h-4 w-4 text-chart-4 mx-auto" /> : <span className="text-xs text-muted-foreground">—</span>}
                             </TableCell>
                             <TableCell className="text-right">
-                              {model.source === "custom" ? (
-                                <div className="flex justify-end gap-1">
-                                  <Button variant="ghost" size="sm" onClick={() => openEditModel(model)}>
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteModel(model.provider, model.id)}
-                                    className="text-destructive hover:text-destructive"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
+                              <div className="flex justify-end gap-1">
+                                {renderScopeToggle(model)}
+                                {model.source === "custom" && (
+                                  <>
+                                    <Button variant="ghost" size="sm" onClick={() => openEditModel(model)}>
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteModel(model.provider, model.id)}
+                                      className="text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}

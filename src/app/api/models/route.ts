@@ -9,6 +9,8 @@
  * GET    /api/models                — List all models and providers
  * POST   /api/models                — Add a provider or model
  * PUT    /api/models                — Update a provider or model
+ *      (action=set-model-scope)     — Include/exclude a model in Pi's enabledModels scope
+ *      (action=reset-model-scope)   — Remove enabledModels (restore unrestricted scope)
  * DELETE /api/models?provider=x     — Delete a provider
  * DELETE /api/models?provider=x&modelId=y — Delete a model
  */
@@ -16,282 +18,96 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, writeFile, access } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
-import { exec } from "child_process";
 import { requireMutationAuth } from "@/lib/api-security";
+import {
+  buildModelCatalog,
+  modelInScope,
+  computeScopedPatterns,
+  scopeLeavesUsableModel,
+  resolveScopedKeys,
+  readSettingsStrict,
+  writeSettingsAtomic,
+  withSettingsLock,
+  modelKey,
+  SettingsScopeError,
+  usableModelKeys,
+} from "@/lib/model-scope";
 
-interface ModelInfo {
-  id: string;
-  name: string;
-  provider: string;
-  contextWindow: number;
-  maxTokens: number;
-  reasoning?: boolean;
-  images?: boolean;
-  cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
-  source?: "custom" | "builtin" | "cli";
-}
-
-interface ProviderInfo {
-  name: string;
-  baseUrl: string;
-  api: string;
-  hasAuth: boolean;
-  authType: "api_key" | "oauth" | "none";
-  modelCount: number;
-  source?: "custom" | "builtin" | "cli";
-  hasApiKey?: boolean;
-}
-
-const MODELS_JSON_PATH = join(homedir(), ".pi", "agent", "models.json");
+const modelsJsonPath = join(homedir(), ".pi", "agent", "models.json");
 const SETTINGS_PATH = join(homedir(), ".pi", "agent", "settings.json");
-const AUTH_PATH = join(homedir(), ".pi", "agent", "auth.json");
 
 async function exists(path: string): Promise<boolean> {
-  try { await access(path); return true; } catch { return false; }
-}
-
-function parseSize(str: string): number {
-  if (!str) return 0;
-  const cleaned = str.replace(/,/g, "");
-  if (cleaned.endsWith("M")) return parseFloat(cleaned) * 1_000_000;
-  if (cleaned.endsWith("K")) return parseFloat(cleaned) * 1_000;
-  return parseInt(cleaned, 10) || 0;
-}
-
-async function findBuiltInModelsPath(): Promise<string> {
   try {
-    const piPath = await new Promise<string>((resolve, reject) => {
-      exec("which pi", (err, stdout) => {
-        if (err) reject(err);
-        else resolve(stdout.trim());
-      });
-    });
-    const { realpathSync } = await import("fs");
-    const realPiPath = realpathSync(piPath);
-    const parts = realPiPath.split("/");
-    const binIdx = parts.lastIndexOf("bin");
-    if (binIdx > 0) {
-      const prefix = parts.slice(0, binIdx).join("/");
-      const candidate = join(prefix, "lib", "node_modules", "@mariozechner", "pi-coding-agent", "node_modules", "@mariozechner", "pi-ai", "dist", "models.generated.js");
-      if (await exists(candidate)) return candidate;
-    }
-    const pkgDir = join(realPiPath, "..", "..");
-    const candidate2 = join(pkgDir, "node_modules", "@mariozechner", "pi-ai", "dist", "models.generated.js");
-    if (await exists(candidate2)) return candidate2;
-  } catch { /* skip */ }
-
-  const home = homedir();
-  const candidates = [
-    join(home, ".npm-global", "lib", "node_modules", "@mariozechner", "pi-coding-agent", "node_modules", "@mariozechner", "pi-ai", "dist", "models.generated.js"),
-    "/usr/local/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-ai/dist/models.generated.js",
-    "/usr/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-ai/dist/models.generated.js",
-  ];
-  for (const c of candidates) {
-    if (await exists(c)) return c;
+    await access(path);
+    return true;
+  } catch {
+    return false;
   }
-  return "";
+}
+
+interface ScopeMeta {
+  active: boolean;
+  patterns: string[];
+  /** True when patterns exist but match no available model (Pi falls back to all). */
+  fallback: boolean;
+  readError?: string;
+}
+
+/**
+ * Build the shared /api/models GET payload: full catalog + per-model
+ * `inScope` flag + scope metadata + CLI catalog health (write protection).
+ */
+async function buildModelsResponse(): Promise<NextResponse> {
+  const catalog = await buildModelCatalog();
+
+  // Scope semantics are evaluated against the CLI-available catalogue (what
+  // Pi can actually use); the full display catalogue may still contain
+  // unauthenticated models, which are not counted for effective scope.
+  const scopeCatalog = catalog.cliAvailable
+    ? catalog.models.filter((m) => catalog.cliModelKeys.has(modelKey(m)))
+    : catalog.models;
+
+  // Lenient scope read for display: a broken settings.json must not hide the catalog.
+  let scope: ScopeMeta = { active: false, patterns: [], fallback: false };
+  try {
+    const settings = await readSettingsStrict(SETTINGS_PATH);
+    const patterns = Array.isArray(settings.enabledModels) ? settings.enabledModels : [];
+    scope = {
+      active: patterns.length > 0,
+      patterns,
+      fallback: patterns.length > 0 && resolveScopedKeys(patterns, scopeCatalog).size === 0,
+    };
+  } catch (err) {
+    scope = {
+      active: false,
+      patterns: [],
+      fallback: false,
+      readError: err instanceof SettingsScopeError ? err.message : "无法读取 settings.json",
+    };
+  }
+
+  const models = catalog.models.map((model) => ({
+    ...model,
+    inScope: scope.active ? modelInScope(scope.patterns, model, scopeCatalog) : true,
+    available: catalog.cliAvailable && catalog.cliModelKeys.has(modelKey(model)),
+  }));
+
+  return NextResponse.json({
+    models,
+    providers: catalog.providers,
+    authProviders: catalog.authProviders,
+    defaultProvider: catalog.settings.defaultProvider,
+    defaultModel: catalog.settings.defaultModel,
+    totalModels: models.length,
+    totalProviders: Object.keys(catalog.providers).length,
+    scope,
+    catalogOk: catalog.cliAvailable,
+  });
 }
 
 export async function GET() {
   try {
-    const home = homedir();
-    const modelsJsonPath = join(home, ".pi", "agent", "models.json");
-    const settingsPath = join(home, ".pi", "agent", "settings.json");
-    const authPath = join(home, ".pi", "agent", "auth.json");
-    const builtInModelsPath = await findBuiltInModelsPath();
-
-    const models: ModelInfo[] = [];
-    const providers: Record<string, ProviderInfo> = {};
-
-    // 1. Read auth.json
-    let authData: Record<string, { type: string; [key: string]: unknown }> = {};
-    if (await exists(authPath)) {
-      try { authData = JSON.parse(await readFile(authPath, "utf-8")); } catch { /* skip */ }
-    }
-
-    // 2. Read custom providers from models.json
-    if (await exists(modelsJsonPath)) {
-      try {
-        const content = await readFile(modelsJsonPath, "utf-8");
-        const modelsJson = JSON.parse(content);
-        const customProviders = modelsJson.providers || {};
-
-        for (const [providerName, config] of Object.entries(customProviders)) {
-          const cfg = config as {
-            baseUrl?: string;
-            apiKey?: string;
-            api?: string;
-            models?: Array<{
-              id: string;
-              name?: string;
-              contextWindow?: number;
-              maxTokens?: number;
-              reasoning?: boolean;
-              input?: string[];
-              cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
-            }>;
-          };
-
-          const hasApiKey = !!(cfg.apiKey && cfg.apiKey.length > 0);
-          const hasOAuth = !!authData[providerName];
-
-          providers[providerName] = {
-            name: providerName,
-            baseUrl: cfg.baseUrl || "",
-            api: cfg.api || "unknown",
-            hasAuth: hasApiKey || hasOAuth,
-            authType: hasOAuth ? "oauth" : hasApiKey ? "api_key" : "none",
-            modelCount: cfg.models?.length || 0,
-            source: "custom",
-            hasApiKey,
-          };
-
-          if (cfg.models) {
-            for (const model of cfg.models) {
-              models.push({
-                id: model.id,
-                name: model.name || model.id,
-                provider: providerName,
-                contextWindow: model.contextWindow || 0,
-                maxTokens: model.maxTokens || 0,
-                reasoning: model.reasoning || false,
-                images: model.input?.includes("image") || false,
-                cost: model.cost,
-                source: "custom",
-              });
-            }
-          }
-        }
-      } catch { /* skip */ }
-    }
-
-    // 3. Load built-in models from pi-ai
-    if (builtInModelsPath && await exists(builtInModelsPath)) {
-      try {
-        const content = await readFile(builtInModelsPath, "utf-8");
-        const modelRegex = /id:\s*"([^"]+)",\s*name:\s*"([^"]+)",\s*api:\s*"([^"]+)",\s*provider:\s*"([^"]+)",\s*baseUrl:\s*"([^"]*)"[^}]*?reasoning:\s*(true|false)[^}]*?input:\s*\[([^\]]*)\][^}]*?cost:\s*\{[^}]*?input:\s*([\d.]+)[^}]*?output:\s*([\d.]+)[^}]*?cacheRead:\s*([\d.]+)[^}]*?cacheWrite:\s*([\d.]+)[^}]*?\}[^}]*?contextWindow:\s*(\d+)[^}]*?maxTokens:\s*(\d+)/g;
-
-        let match;
-        while ((match = modelRegex.exec(content)) !== null) {
-          const [, id, name, , provider, , reasoning, input, costIn, costOut, cacheRead, cacheWrite, contextWindow, maxTokens] = match;
-
-          const providerAuthKey = provider;
-          const isAuthenticated = !!authData[providerAuthKey] ||
-            !!authData[`${providerAuthKey}-gemini-cli`] ||
-            !!providers[providerAuthKey];
-
-          if (!isAuthenticated) continue;
-
-          const existing = models.find(m => m.provider === provider && m.id === id);
-          if (existing) continue;
-
-          if (!providers[provider]) {
-            const authEntry = authData[provider] || authData[`${provider}-gemini-cli`];
-            providers[provider] = {
-              name: provider,
-              baseUrl: "",
-              api: "built-in",
-              hasAuth: !!authEntry,
-              authType: authEntry?.type === "oauth" ? "oauth" : authEntry ? "api_key" : "none",
-              modelCount: 0,
-              source: "builtin",
-            };
-          }
-
-          models.push({
-            id,
-            name,
-            provider,
-            contextWindow: parseInt(contextWindow) || 0,
-            maxTokens: parseInt(maxTokens) || 0,
-            reasoning: reasoning === "true",
-            images: input.includes('"image"'),
-            cost: {
-              input: parseFloat(costIn) || 0,
-              output: parseFloat(costOut) || 0,
-              cacheRead: parseFloat(cacheRead) || 0,
-              cacheWrite: parseFloat(cacheWrite) || 0,
-            },
-            source: "builtin",
-          });
-        }
-      } catch { /* skip */ }
-    }
-
-    // 4. Try pi --list-models
-    try {
-      const output = await new Promise<string>((resolve, reject) => {
-        exec("pi --list-models 2>&1", { timeout: 10000 }, (error, stdout) => {
-          if (error) reject(error);
-          else resolve(stdout);
-        });
-      });
-
-      const lines = output.trim().split("\n");
-      for (const line of lines) {
-        if (line.startsWith("provider") || !line.trim()) continue;
-        const parts = line.trim().split(/\s+/);
-        if (parts.length >= 6) {
-          const [provider, modelId, context, maxOut, thinking, images] = parts;
-          const existing = models.find(m => m.provider === provider && m.id === modelId);
-          if (existing) continue;
-
-          if (!providers[provider]) {
-            providers[provider] = {
-              name: provider,
-              baseUrl: "",
-              api: "unknown",
-              hasAuth: true,
-              authType: "api_key",
-              modelCount: 0,
-              source: "cli",
-            };
-          }
-
-          models.push({
-            id: modelId,
-            name: modelId,
-            provider,
-            contextWindow: parseSize(context),
-            maxTokens: parseSize(maxOut),
-            reasoning: thinking === "yes",
-            images: images === "yes",
-            source: "cli",
-          });
-        }
-      }
-    } catch { /* skip */ }
-
-    // Update model counts
-    for (const provider of Object.keys(providers)) {
-      providers[provider].modelCount = models.filter(m => m.provider === provider).length;
-    }
-
-    // Read settings
-    let defaultProvider = "";
-    let defaultModel = "";
-    if (await exists(settingsPath)) {
-      try {
-        const settings = JSON.parse(await readFile(settingsPath, "utf-8"));
-        defaultProvider = settings.defaultProvider || "";
-        defaultModel = settings.defaultModel || "";
-      } catch { /* skip */ }
-    }
-
-    const authProviders = Object.entries(authData).map(([key, val]) => ({
-      id: key,
-      type: val.type as string,
-    }));
-
-    return NextResponse.json({
-      models,
-      providers,
-      authProviders,
-      defaultProvider,
-      defaultModel,
-      totalModels: models.length,
-      totalProviders: Object.keys(providers).length,
-    });
+    return await buildModelsResponse();
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to read models", details: String(error) },
@@ -302,9 +118,9 @@ export async function GET() {
 
 /** Read and parse the models.json file, returning the providers object. */
 async function readModelsJson(): Promise<Record<string, any>> {
-  if (!(await exists(MODELS_JSON_PATH))) return {};
+  if (!(await exists(modelsJsonPath))) return {};
   try {
-    const content = await readFile(MODELS_JSON_PATH, "utf-8");
+    const content = await readFile(modelsJsonPath, "utf-8");
     const parsed = JSON.parse(content);
     return parsed.providers || {};
   } catch {
@@ -315,22 +131,54 @@ async function readModelsJson(): Promise<Record<string, any>> {
 /** Write the providers object back to models.json, preserving other top-level keys. */
 async function writeModelsJson(providers: Record<string, any>): Promise<void> {
   let existing: Record<string, any> = { providers: {} };
-  if (await exists(MODELS_JSON_PATH)) {
+  if (await exists(modelsJsonPath)) {
     try {
-      existing = JSON.parse(await readFile(MODELS_JSON_PATH, "utf-8"));
-    } catch { /* ignore */ }
+      existing = JSON.parse(await readFile(modelsJsonPath, "utf-8"));
+    } catch {
+      /* ignore */
+    }
   }
   existing.providers = providers;
-  await writeFile(MODELS_JSON_PATH, JSON.stringify(existing, null, 2) + "\n");
+  await writeFile(modelsJsonPath, JSON.stringify(existing, null, 2) + "\n");
 }
+
+/** Parse a JSON object body; null when missing/invalid (callers return 400). */
+async function readJsonBody(request: NextRequest): Promise<Record<string, unknown> | null> {
+  try {
+    const body = await request.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+    return body as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** Typed view over the JSON body used by provider/model mutation actions. */
+interface ModelBodyInput {
+  id?: unknown;
+  name?: unknown;
+  contextWindow?: unknown;
+  maxTokens?: unknown;
+  reasoning?: unknown;
+  input?: unknown;
+  cost?: unknown;
+}
+type MutationBody = Record<string, unknown> & {
+  model?: ModelBodyInput;
+  updates?: Record<string, unknown>;
+};
 
 export async function POST(request: NextRequest) {
   const authError = await requireMutationAuth(request);
   if (authError) return authError;
 
   try {
-    const body = await request.json();
-    const { action } = body;
+    const body = await readJsonBody(request);
+    if (!body) {
+      return NextResponse.json({ error: "Body must be a valid JSON object" }, { status: 400 });
+    }
+    const mutation = body as MutationBody;
+    const { action } = mutation;
 
     if (!action || typeof action !== "string") {
       return NextResponse.json({ error: "action is required" }, { status: 400 });
@@ -339,7 +187,7 @@ export async function POST(request: NextRequest) {
     const providers = await readModelsJson();
 
     if (action === "add-provider") {
-      const { name, baseUrl, api, apiKey } = body;
+      const { name, baseUrl, api, apiKey } = mutation;
       if (!name || typeof name !== "string") {
         return NextResponse.json({ error: "name is required" }, { status: 400 });
       }
@@ -365,7 +213,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "add-model") {
-      const { provider, model } = body;
+      const { provider, model } = mutation;
       if (!provider || typeof provider !== "string") {
         return NextResponse.json({ error: "provider is required" }, { status: 400 });
       }
@@ -407,17 +255,25 @@ export async function PUT(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const body = await request.json();
-    const { action } = body;
+    const body = await readJsonBody(request);
+    if (!body) {
+      return NextResponse.json({ error: "Body must be a valid JSON object" }, { status: 400 });
+    }
+    const mutation = body as MutationBody;
+    const { action } = mutation;
 
     if (!action || typeof action !== "string") {
       return NextResponse.json({ error: "action is required" }, { status: 400 });
     }
 
+    if (action === "set-model-scope" || action === "reset-model-scope") {
+      return await handleScopeAction(action, body);
+    }
+
     const providers = await readModelsJson();
 
     if (action === "update-provider") {
-      const { name, baseUrl, api, apiKey } = body;
+      const { name, baseUrl, api, apiKey } = mutation;
       if (!name || typeof name !== "string") {
         return NextResponse.json({ error: "name is required" }, { status: 400 });
       }
@@ -438,7 +294,7 @@ export async function PUT(request: NextRequest) {
     }
 
     if (action === "update-model") {
-      const { provider, modelId, updates } = body;
+      const { provider, modelId, updates } = mutation;
       if (!provider || typeof provider !== "string") {
         return NextResponse.json({ error: "provider is required" }, { status: 400 });
       }
@@ -453,24 +309,129 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: `Model "${modelId}" not found in provider "${provider}"` }, { status: 404 });
       }
       const existing = providers[provider].models[modelIdx];
-      if (updates.id !== undefined && typeof updates.id === "string") existing.id = updates.id;
-      if (updates.name !== undefined) existing.name = updates.name;
-      if (updates.contextWindow !== undefined) existing.contextWindow = updates.contextWindow;
-      if (updates.maxTokens !== undefined) existing.maxTokens = updates.maxTokens;
-      if (updates.reasoning !== undefined) existing.reasoning = !!updates.reasoning;
-      if (updates.input !== undefined) existing.input = updates.input;
-      if (updates.cost !== undefined) existing.cost = updates.cost;
+      const modelUpdates: Record<string, unknown> = updates ?? {};
+      if (modelUpdates.id !== undefined && typeof modelUpdates.id === "string") existing.id = modelUpdates.id;
+      if (modelUpdates.name !== undefined) existing.name = modelUpdates.name;
+      if (modelUpdates.contextWindow !== undefined) existing.contextWindow = modelUpdates.contextWindow;
+      if (modelUpdates.maxTokens !== undefined) existing.maxTokens = modelUpdates.maxTokens;
+      if (modelUpdates.reasoning !== undefined) existing.reasoning = !!modelUpdates.reasoning;
+      if (modelUpdates.input !== undefined) existing.input = modelUpdates.input;
+      if (modelUpdates.cost !== undefined) existing.cost = modelUpdates.cost;
       await writeModelsJson(providers);
       return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
   } catch (error) {
+    if (error instanceof SettingsScopeError) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json(
       { error: "Failed to update models", details: String(error) },
       { status: 500 }
     );
   }
+}
+
+/**
+ * PUT action=set-model-scope { provider, modelId, inScope: boolean }
+ *   / reset-model-scope
+ *
+ * These only touch `enabledModels` in settings.json (Pi's model selection
+ * scope). They never delete models/auth or change defaultProvider/defaultModel.
+ */
+async function handleScopeAction(action: string, body: Record<string, unknown>): Promise<NextResponse> {
+  if (action === "reset-model-scope") {
+    return withSettingsLock(SETTINGS_PATH, async () => {
+      const settings = await readSettingsStrict(SETTINGS_PATH);
+      if (settings.enabledModels !== undefined) {
+        const next = { ...settings };
+        delete next.enabledModels;
+        await writeSettingsAtomic(SETTINGS_PATH, next);
+      }
+      const refreshed = await buildModelsResponse();
+      return NextResponse.json({ success: true, ...(await refreshed.json()) });
+    });
+  }
+
+  // set-model-scope
+  const { provider, modelId, inScope } = body;
+  if (typeof provider !== "string" || !provider) {
+    return NextResponse.json({ error: "provider is required" }, { status: 400 });
+  }
+  if (typeof modelId !== "string" || !modelId) {
+    return NextResponse.json({ error: "modelId is required" }, { status: 400 });
+  }
+  if (typeof inScope !== "boolean") {
+    return NextResponse.json({ error: "inScope must be a boolean" }, { status: 400 });
+  }
+
+  // Build the catalog in-process (no network self-calls). The CLI list is the
+  // authoritative "actually available" set; without it we refuse to rewrite
+  // the scope so a partial catalog cannot clobber the allowlist.
+  const catalog = await buildModelCatalog();
+  if (!catalog.cliAvailable) {
+    return NextResponse.json(
+      { error: "无法获取 pi --list-models 目录，为避免用不完整目录覆盖选择范围，已放弃本次修改" },
+      { status: 503 }
+    );
+  }
+
+  const target = catalog.models.find((m) => m.provider === provider && m.id === modelId);
+  if (!target) {
+    return NextResponse.json(
+      { error: `Model "${modelId}" not found in provider "${provider}"` },
+      { status: 404 }
+    );
+  }
+
+  // Scope semantics are evaluated against the CLI-available catalogue; a
+  // model that is not actually usable (e.g. custom provider without valid
+  // credentials) must not be added to or removed from the scope.
+  const scopeCatalog = catalog.models.filter((m) => catalog.cliModelKeys.has(modelKey(m)));
+  if (!catalog.cliModelKeys.has(modelKey(target))) {
+    return NextResponse.json(
+      { error: `模型 "${modelKey(target)}" 当前不可用（无凭据或未出现在 pi --list-models 目录），请先完成认证后再设置范围` },
+      { status: 400 }
+    );
+  }
+
+  return withSettingsLock(SETTINGS_PATH, async () => {
+    // Serialize same-process mutations and re-read immediately before saving.
+    // Other processes do not share this lock; concurrent external edits are
+    // still possible. Only enabledModels is changed in this snapshot.
+    const settings = await readSettingsStrict(SETTINGS_PATH);
+    const patterns: string[] | null = Array.isArray(settings.enabledModels)
+      ? settings.enabledModels
+      : null;
+
+    const result = computeScopedPatterns({
+      patterns,
+      target: { provider: target.provider, id: target.id },
+      action: inScope ? "include" : "exclude",
+      catalog: scopeCatalog,
+    });
+
+    if (inScope && !result.changed) {
+      const refreshed = await buildModelsResponse();
+      return NextResponse.json({ success: true, message: "模型已在选择范围内", ...(await refreshed.json()) });
+    }
+
+    if (!inScope && !scopeLeavesUsableModel(result.patterns, usableModelKeys(catalog), scopeCatalog)) {
+      return NextResponse.json(
+        { error: `不能排除 "${modelKey(target)}"：排除后模型选择范围将没有任何可用模型` },
+        { status: 400 }
+      );
+    }
+
+    if (result.changed) {
+      const next = { ...settings, enabledModels: result.patterns };
+      await writeSettingsAtomic(SETTINGS_PATH, next);
+    }
+
+    const refreshed = await buildModelsResponse();
+    return NextResponse.json({ success: true, ...(await refreshed.json()) });
+  });
 }
 
 export async function DELETE(request: NextRequest) {
