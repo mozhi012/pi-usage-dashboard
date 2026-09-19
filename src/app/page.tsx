@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { UsageFilters } from "@/components/usage-filters";
+import {
+  DEFAULT_USAGE_FILTERS,
+  filterUsageData,
+  getFilterOptions,
+  hasUsageFilters,
+  type UsageFilters as FilterState,
+} from "@/lib/filter-usage";
 import { useUsageStream } from "@/hooks/use-usage-stream";
 import { SummaryCards } from "@/components/summary-cards";
 import { TokensByModelChart } from "@/components/tokens-by-model-chart";
@@ -27,118 +35,41 @@ import Link from "next/link";
 type TimeRange = "daily" | "weekly" | "monthly";
 
 export default function Home() {
-  const { data, status, lastUpdated, syncing, refresh, sync } = useUsageStream();
+  const { data, status, lastUpdated, syncing, sync } = useUsageStream();
   const [timeRange, setTimeRange] = useState<TimeRange>("daily");
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_USAGE_FILTERS);
+  const [clock, setClock] = useState(() => Date.now());
 
-  // Helper: get the time bucket key for a timestamp
-  const getTimeKey = (timestamp: number, range: TimeRange): string => {
-    const d = new Date(timestamp);
-    if (range === "monthly") {
-      return d.toISOString().slice(0, 7); // YYYY-MM
+  // Advance rolling windows even when no new usage arrives.
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const now = Math.max(clock, lastUpdated?.getTime() ?? 0);
+  const filteredData = useMemo(
+    () => data ? filterUsageData(data, filters, now) : null,
+    [data, filters, now],
+  );
+  const options = useMemo(
+    () => data ? getFilterOptions(data, filters.provider) : { providers: [], models: [] },
+    [data, filters.provider],
+  );
+  // Keep active selections visible if a live update removes their last message.
+  const providers = filters.provider && !options.providers.includes(filters.provider)
+    ? [...options.providers, filters.provider] : options.providers;
+  const models = filters.model && !options.models.includes(filters.model)
+    ? [...options.models, filters.model] : options.models;
+  const isFiltered = hasUsageFilters(filters);
+
+  function changeFilters(next: FilterState) {
+    if (data && next.provider !== filters.provider && next.model &&
+        !getFilterOptions(data, next.provider).models.includes(next.model)) {
+      next = { ...next, model: "" };
     }
-    if (range === "weekly") {
-      const dayOfWeek = d.getUTCDay();
-      const monday = new Date(d);
-      monday.setUTCDate(d.getUTCDate() - ((dayOfWeek + 6) % 7));
-      return monday.toISOString().split("T")[0];
-    }
-    return d.toISOString().split("T")[0]; // YYYY-MM-DD
-  };
-
-  // Compute filtered summary based on selected time range
-  const filteredSummary = useMemo(() => {
-    if (!data) return null;
-
-    const source =
-      timeRange === "weekly"
-        ? data.byWeek
-        : timeRange === "monthly"
-        ? data.byMonth
-        : data.byDay;
-
-    let totalTokens = 0;
-    let totalInput = 0;
-    let totalOutput = 0;
-    let totalCost = 0;
-    let totalTurns = 0;
-    let totalSessions = 0;
-
-    for (const bucket of Object.values(source)) {
-      totalTokens += bucket.tokens;
-      totalInput += bucket.input;
-      totalOutput += bucket.output;
-      totalCost += bucket.cost;
-      totalTurns += bucket.turns;
-      totalSessions += bucket.sessions;
-    }
-
-    return {
-      ...data.summary,
-      totalTokens,
-      totalInputTokens: totalInput,
-      totalOutputTokens: totalOutput,
-      totalCost,
-      totalAssistantTurns: totalTurns,
-      totalSessions,
-    };
-  }, [data, timeRange]);
-
-  // Compute byModel filtered by time range
-  const filteredByModel = useMemo(() => {
-    if (!data) return {} as NonNullable<typeof data>["byModel"];
-
-    // Get the set of valid time keys for the current range
-    const source =
-      timeRange === "weekly"
-        ? data.byWeek
-        : timeRange === "monthly"
-        ? data.byMonth
-        : data.byDay;
-    const validKeys = new Set(Object.keys(source));
-
-    // Rebuild byModel from session messages filtered by time range
-    const byModel: typeof data.byModel = {};
-    const sessionsByModel = new Map<string, Set<string>>();
-
-    for (const session of data.sessions) {
-      for (const msg of session.messages) {
-        if (!msg.timestamp) continue;
-        const key = getTimeKey(msg.timestamp, timeRange);
-        if (!validKeys.has(key)) continue;
-
-        if (!byModel[msg.model]) {
-          byModel[msg.model] = {
-            tokens: 0,
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-            cost: 0,
-            turns: 0,
-            sessions: 0,
-            hasPricing: data.byModel[msg.model]?.hasPricing ?? false,
-          };
-          sessionsByModel.set(msg.model, new Set());
-        }
-
-        byModel[msg.model].tokens += msg.usage.totalTokens || 0;
-        byModel[msg.model].input += msg.usage.input || 0;
-        byModel[msg.model].output += msg.usage.output || 0;
-        byModel[msg.model].cacheRead += msg.usage.cacheRead || 0;
-        byModel[msg.model].cacheWrite += msg.usage.cacheWrite || 0;
-        byModel[msg.model].cost += msg.usage.cost?.total || 0;
-        byModel[msg.model].turns++;
-        sessionsByModel.get(msg.model)!.add(session.sessionId);
-      }
-    }
-
-    // Set session counts
-    for (const [model, sessions] of sessionsByModel) {
-      if (byModel[model]) byModel[model].sessions = sessions.size;
-    }
-
-    return byModel;
-  }, [data, timeRange]);
+    setClock(Date.now());
+    setFilters(next);
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -228,7 +159,7 @@ export default function Home() {
       </div>
 
       <main className="container mx-auto px-6 py-6 space-y-6">
-        {!data ? (
+        {!filteredData ? (
           <div className="flex items-center justify-center h-64">
             <div className="flex items-center gap-3 text-muted-foreground">
               <RefreshCw className="h-5 w-5 animate-spin" />
@@ -237,10 +168,23 @@ export default function Home() {
           </div>
         ) : (
           <>
-            <SummaryCards
-              summary={filteredSummary ?? data.summary}
-              timeRange={timeRange}
+            <UsageFilters
+              filters={filters}
+              providers={providers}
+              models={models}
+              onChange={changeFilters}
             />
+            <SummaryCards summary={filteredData.summary} filtered={isFiltered} />
+            {isFiltered && (
+              <p className="text-xs text-muted-foreground">
+                用量按匹配的助手消息统计；用户轮次为匹配会话的总用户轮次。今天按本地时间，其余时段为最近连续时长。
+              </p>
+            )}
+            {filteredData.sessions.length === 0 && (
+              <p role="status" className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+                暂无匹配数据，请调整筛选条件。
+              </p>
+            )}
 
             <Tabs defaultValue="overview" className="space-y-4">
               <TabsList>
@@ -265,26 +209,26 @@ export default function Home() {
               <TabsContent value="overview" className="space-y-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <TokensByDayChart
-                    byDay={data.byDay}
-                    byWeek={data.byWeek}
-                    byMonth={data.byMonth}
+                    byDay={filteredData.byDay}
+                    byWeek={filteredData.byWeek}
+                    byMonth={filteredData.byMonth}
                     timeRange={timeRange}
                     onTimeRangeChange={setTimeRange}
                   />
-                  <TokensByModelChart byModel={filteredByModel} />
+                  <TokensByModelChart byModel={filteredData.byModel} />
                 </div>
               </TabsContent>
 
               <TabsContent value="models">
-                <TokensByModelChart byModel={filteredByModel} fullWidth />
+                <TokensByModelChart byModel={filteredData.byModel} fullWidth />
               </TabsContent>
 
               <TabsContent value="projects">
-                <ProjectsTable byProject={data.byProject} />
+                <ProjectsTable byProject={filteredData.byProject} />
               </TabsContent>
 
               <TabsContent value="sessions">
-                <SessionsTable sessions={data.sessions} />
+                <SessionsTable sessions={filteredData.sessions} filtered={isFiltered} />
               </TabsContent>
             </Tabs>
           </>

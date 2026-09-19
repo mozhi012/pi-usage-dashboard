@@ -32,6 +32,7 @@ import type { SessionData } from "@/lib/parse-sessions";
 
 interface Props {
   sessions: SessionData[];
+  filtered?: boolean;
 }
 
 function formatTokens(n: number): string {
@@ -78,7 +79,7 @@ function timeAgo(timestamp: number): string {
   return formatDate(timestamp);
 }
 
-export function SessionsTable({ sessions }: Props) {
+export function SessionsTable({ sessions, filtered = false }: Props) {
   const [selectedSession, setSelectedSession] = useState<SessionData | null>(
     null
   );
@@ -160,7 +161,7 @@ export function SessionsTable({ sessions }: Props) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold">
-            全部会话
+            {filtered ? "匹配会话" : "全部会话"}
             <span className="ml-2 text-sm font-normal text-muted-foreground">
               (共 {sessions.length} 个，按最近活跃时间排序)
             </span>
@@ -177,7 +178,7 @@ export function SessionsTable({ sessions }: Props) {
                   <TableHead>模型</TableHead>
                   <TableHead className="text-right">Token 用量</TableHead>
                   <TableHead className="text-right">费用</TableHead>
-                  <TableHead className="text-right">用户</TableHead>
+                  <TableHead className="text-right">{filtered ? "用户（会话总计）" : "用户"}</TableHead>
                   <TableHead className="text-right">助手</TableHead>
                 </TableRow>
               </TableHeader>

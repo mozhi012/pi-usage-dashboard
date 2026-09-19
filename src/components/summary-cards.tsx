@@ -12,8 +12,6 @@ import {
   Users,
 } from "lucide-react";
 
-type TimeRange = "daily" | "weekly" | "monthly";
-
 interface SummaryProps {
   summary: {
     totalSessions: number;
@@ -28,7 +26,7 @@ interface SummaryProps {
     modelsUsed: number;
     providersUsed: number;
   };
-  timeRange?: TimeRange;
+  filtered?: boolean;
 }
 
 function formatTokens(n: number): string {
@@ -44,19 +42,13 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
 }
 
-const TIME_RANGE_LABELS: Record<TimeRange, string> = {
-  daily: "全部日期",
-  weekly: "全部周",
-  monthly: "全部月份",
-};
-
-export function SummaryCards({ summary, timeRange = "daily" }: SummaryProps) {
+export function SummaryCards({ summary, filtered = false }: SummaryProps) {
   const cards = [
     {
       label: "总 Token 数",
       value: formatTokens(summary.totalTokens),
       icon: Zap,
-      description: "跨所有会话累计",
+      description: filtered ? "当前筛选范围内累计" : "跨所有会话累计",
       accent: "text-chart-1",
     },
     {
@@ -91,7 +83,9 @@ export function SummaryCards({ summary, timeRange = "daily" }: SummaryProps) {
       label: "会话数",
       value: summary.totalSessions.toString(),
       icon: MessageSquare,
-      description: `${summary.totalUserTurns} 用户轮次 / ${summary.totalAssistantTurns} 助手轮次`,
+      description: filtered
+        ? `${summary.totalAssistantTurns} 助手轮次 · 匹配会话共 ${summary.totalUserTurns} 用户轮次`
+        : `${summary.totalUserTurns} 用户轮次 / ${summary.totalAssistantTurns} 助手轮次`,
       accent: "text-chart-1",
     },
     {
@@ -112,11 +106,6 @@ export function SummaryCards({ summary, timeRange = "daily" }: SummaryProps) {
 
   return (
     <div className="space-y-2">
-      {timeRange && (
-        <p className="text-xs text-muted-foreground">
-          当前统计范围：<span className="font-medium text-foreground">{TIME_RANGE_LABELS[timeRange]}</span>
-        </p>
-      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {cards.map((card) => (
         <Card key={card.label}>
