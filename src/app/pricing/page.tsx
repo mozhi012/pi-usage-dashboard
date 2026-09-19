@@ -102,7 +102,7 @@ export default function PricingPage() {
     });
     const data = await res.json();
     if (!res.ok) {
-      setSaveError(data.error || "Failed to save pricing");
+      setSaveError(data.error || "保存定价失败");
       return;
     }
     setEditModel(null);
@@ -126,7 +126,7 @@ export default function PricingPage() {
     });
     if (!res.ok) {
       const data = await res.json();
-      setSaveError(data.error || "Failed to delete pricing");
+      setSaveError(data.error || "删除定价失败");
       return;
     }
     await fetchPricing();
@@ -179,15 +179,15 @@ export default function PricingPage() {
               <Link href="/">
                 <Button variant="ghost" size="sm" className="gap-1.5">
                   <ArrowLeft className="h-4 w-4" />
-                  Dashboard
+                  返回主面板
                 </Button>
               </Link>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                  Model Pricing
+                  模型定价
                 </h1>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Set prices per 1M tokens to calculate costs
+                  设置每 100 万 Token 的单价以核算费用
                 </p>
               </div>
             </div>
@@ -195,26 +195,26 @@ export default function PricingPage() {
               <DialogTrigger>
                 <Button className="gap-1.5">
                   <Plus className="h-4 w-4" />
-                  Add Model
+                  添加定价
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add Model Pricing</DialogTitle>
+                  <DialogTitle>添加模型定价</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-2">
                   <div>
-                    <Label>Model Name</Label>
+                    <Label>模型名称</Label>
                     <Input
                       value={newModel}
                       onChange={(e) => setNewModel(e.target.value)}
-                      placeholder="e.g. claude-sonnet-4-20250514"
+                      placeholder="例如: claude-sonnet-4-20250514"
                       className="mt-1.5"
                     />
                     {unpricedModels.length > 0 && (
                       <div className="mt-2">
                         <p className="text-xs text-muted-foreground mb-1.5">
-                          Models without pricing:
+                          尚未配置定价的模型：
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {unpricedModels.map((m) => (
@@ -244,7 +244,7 @@ export default function PricingPage() {
                   )}
                   <div className="flex justify-end gap-2 pt-2">
                     <DialogClose>
-                      <Button variant="outline">Cancel</Button>
+                      <Button variant="outline">取消</Button>
                     </DialogClose>
                     <Button
                       onClick={() => handleSave(newModel)}
@@ -252,7 +252,7 @@ export default function PricingPage() {
                       className="gap-1.5"
                     >
                       <Save className="h-4 w-4" />
-                      Save
+                      保存
                     </Button>
                   </div>
                 </div>
@@ -268,7 +268,7 @@ export default function PricingPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
-              Configured Pricing
+              已配置定价
               <Badge variant="secondary" className="ml-1">
                 {pricing.length}
               </Badge>
@@ -277,32 +277,32 @@ export default function PricingPage() {
           <CardContent>
             {pricing.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <p>No pricing configured yet.</p>
+                <p>暂无已配置的定价规则。</p>
                 <p className="text-sm mt-1">
-                  Add model pricing to calculate costs from token usage.
+                  添加模型单价后，将自动根据 Token 用量核算花费。
                 </p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Model</TableHead>
+                    <TableHead>模型</TableHead>
                     <TableHead className="text-right">
-                      Input $/1M
+                      输入 $/1M
                     </TableHead>
                     <TableHead className="text-right">
-                      Output $/1M
+                      输出 $/1M
                     </TableHead>
                     <TableHead className="text-right">
-                      Cache Read $/1M
+                      缓存读取 $/1M
                     </TableHead>
                     <TableHead className="text-right">
-                      Cache Write $/1M
+                      缓存写入 $/1M
                     </TableHead>
                     <TableHead className="text-right">
-                      Calculated Cost
+                      核算费用
                     </TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-right">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -348,7 +348,7 @@ export default function PricingPage() {
                             <DialogContent>
                               <DialogHeader>
                                 <DialogTitle>
-                                  Edit Pricing: {p.model}
+                                  编辑定价: {p.model}
                                 </DialogTitle>
                               </DialogHeader>
                               <div className="space-y-4 pt-2">
@@ -365,14 +365,14 @@ export default function PricingPage() {
                                 )}
                                 <div className="flex justify-end gap-2 pt-2">
                                   <DialogClose>
-                                    <Button variant="outline">Cancel</Button>
+                                    <Button variant="outline">取消</Button>
                                   </DialogClose>
                                   <Button
                                     onClick={() => handleSave(p.model)}
                                     className="gap-1.5"
                                   >
                                     <Save className="h-4 w-4" />
-                                    Save
+                                    保存
                                   </Button>
                                 </div>
                               </div>
@@ -400,22 +400,22 @@ export default function PricingPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
-              All Models Usage
+              全部模型用量统计
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Model</TableHead>
-                  <TableHead className="text-right">Input Tokens</TableHead>
-                  <TableHead className="text-right">Output Tokens</TableHead>
-                  <TableHead className="text-right">Cache Read</TableHead>
-                  <TableHead className="text-right">Cache Write</TableHead>
-                  <TableHead className="text-right">Total Tokens</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
-                  <TableHead className="text-right">Pricing</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>模型</TableHead>
+                  <TableHead className="text-right">输入 Token</TableHead>
+                  <TableHead className="text-right">输出 Token</TableHead>
+                  <TableHead className="text-right">缓存读取</TableHead>
+                  <TableHead className="text-right">缓存写入</TableHead>
+                  <TableHead className="text-right">总 Token</TableHead>
+                  <TableHead className="text-right">费用</TableHead>
+                  <TableHead className="text-right">定价状态</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -450,11 +450,11 @@ export default function PricingPage() {
                             variant="default"
                             className="text-xs bg-green-600"
                           >
-                            Set
+                            已设置
                           </Badge>
                         ) : (
                           <Badge variant="secondary" className="text-xs">
-                            None
+                            未设置
                           </Badge>
                         )}
                       </TableCell>
@@ -516,20 +516,20 @@ function PriceInputs({
       {usage && (
         <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
           <p>
-            <span className="font-medium">Usage:</span>{" "}
-            {formatTokens(usage.input)} input, {formatTokens(usage.output)}{" "}
-            output, {formatTokens(usage.cacheRead)} cache read,{" "}
-            {formatTokens(usage.cacheWrite)} cache write
+            <span className="font-medium">历史用量：</span>{" "}
+            {formatTokens(usage.input)} 输入，{formatTokens(usage.output)}{" "}
+            输出，{formatTokens(usage.cacheRead)} 缓存读取，{" "}
+            {formatTokens(usage.cacheWrite)} 缓存写入
           </p>
           <p>
-            <span className="font-medium">Turns:</span> {usage.turns} |{" "}
-            <span className="font-medium">Sessions:</span> {usage.sessions}
+            <span className="font-medium">轮次：</span> {usage.turns} |{" "}
+            <span className="font-medium">会话：</span> {usage.sessions}
           </p>
         </div>
       )}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label className="text-xs">Input Price ($/1M tokens)</Label>
+          <Label className="text-xs">提示词输入单价 ($/1M Token)</Label>
           <Input
             type="number"
             step="0.01"
@@ -543,7 +543,7 @@ function PriceInputs({
           />
         </div>
         <div>
-          <Label className="text-xs">Output Price ($/1M tokens)</Label>
+          <Label className="text-xs">模型输出单价 ($/1M Token)</Label>
           <Input
             type="number"
             step="0.01"
@@ -557,7 +557,7 @@ function PriceInputs({
           />
         </div>
         <div>
-          <Label className="text-xs">Cache Read Price ($/1M tokens)</Label>
+          <Label className="text-xs">缓存读取单价 ($/1M Token)</Label>
           <Input
             type="number"
             step="0.01"
@@ -571,7 +571,7 @@ function PriceInputs({
           />
         </div>
         <div>
-          <Label className="text-xs">Cache Write Price ($/1M tokens)</Label>
+          <Label className="text-xs">缓存写入单价 ($/1M Token)</Label>
           <Input
             type="number"
             step="0.01"
@@ -587,7 +587,7 @@ function PriceInputs({
       </div>
       {estimatedCost && (
         <div className="rounded-md bg-primary/10 p-3 text-sm">
-          <span className="font-medium">Estimated total cost:</span>{" "}
+          <span className="font-medium">预估总花费：</span>{" "}
           <span className="text-primary font-bold">{estimatedCost}</span>
         </div>
       )}

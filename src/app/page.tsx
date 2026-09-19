@@ -147,10 +147,10 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                Pi Usage Dashboard
+                Pi 用量仪表盘
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Token usage & cost tracking across all sessions
+                全量会话的 Token 用量与费用追踪
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -165,16 +165,16 @@ export default function Home() {
                 )}
                 <span className="text-xs text-muted-foreground">
                   {status === "connected"
-                    ? "Live"
+                    ? "实时在线"
                     : status === "connecting"
-                    ? "Connecting..."
-                    : "Disconnected"}
+                    ? "连接中..."
+                    : "已断开"}
                 </span>
               </div>
 
               {lastUpdated && (
                 <span className="text-xs text-muted-foreground">
-                  Updated {lastUpdated.toLocaleTimeString()}
+                  更新于 {lastUpdated.toLocaleTimeString()}
                 </span>
               )}
               <Link
@@ -182,35 +182,35 @@ export default function Home() {
                 className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
               >
                 <Cpu className="h-3.5 w-3.5" />
-                Models
+                模型
               </Link>
               <Link
                 href="/hotkeys"
                 className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
               >
                 <Keyboard className="h-3.5 w-3.5" />
-                Hotkeys
+                快捷键
               </Link>
               <Link
                 href="/extensions"
                 className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
               >
                 <Puzzle className="h-3.5 w-3.5" />
-                Extensions
+                扩展
               </Link>
               <Link
                 href="/settings"
                 className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
               >
                 <Settings className="h-3.5 w-3.5" />
-                Sources
+                数据源
               </Link>
               <Link
                 href="/pricing"
                 className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
               >
                 <DollarSign className="h-3.5 w-3.5" />
-                Pricing
+                定价
               </Link>
               <button
                 onClick={sync}
@@ -220,7 +220,7 @@ export default function Home() {
                 <RefreshCw
                   className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`}
                 />
-                Sync
+                同步数据
               </button>
             </div>
           </div>
@@ -232,7 +232,7 @@ export default function Home() {
           <div className="flex items-center justify-center h-64">
             <div className="flex items-center gap-3 text-muted-foreground">
               <RefreshCw className="h-5 w-5 animate-spin" />
-              <span>Loading session data...</span>
+              <span>正在加载会话数据...</span>
             </div>
           </div>
         ) : (
@@ -246,19 +246,19 @@ export default function Home() {
               <TabsList>
                 <TabsTrigger value="overview" className="gap-1.5">
                   <Activity className="h-3.5 w-3.5" />
-                  Overview
+                  概览
                 </TabsTrigger>
                 <TabsTrigger value="models" className="gap-1.5">
                   <BarChart3 className="h-3.5 w-3.5" />
-                  Models
+                  模型分布
                 </TabsTrigger>
                 <TabsTrigger value="projects" className="gap-1.5">
                   <FolderOpen className="h-3.5 w-3.5" />
-                  Projects
+                  项目列表
                 </TabsTrigger>
                 <TabsTrigger value="sessions" className="gap-1.5">
                   <History className="h-3.5 w-3.5" />
-                  Sessions
+                  会话列表
                 </TabsTrigger>
               </TabsList>
 

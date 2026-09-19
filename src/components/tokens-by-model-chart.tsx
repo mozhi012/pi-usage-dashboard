@@ -71,7 +71,7 @@ export function TokensByModelChart({ byModel, fullWidth }: Props) {
     <Card className={fullWidth ? "" : ""}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold">
-          Tokens & Cost by Model
+          各模型 Token 用量与费用
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -137,13 +137,13 @@ export function TokensByModelChart({ byModel, fullWidth }: Props) {
                       <p style={{ fontWeight: 600, marginBottom: 4 }}>
                         {item.fullModel}
                       </p>
-                      <p>Tokens: {formatTokens(item.tokens)}</p>
-                      <p>Input: {formatTokens(item.input)}</p>
-                      <p>Output: {formatTokens(item.output)}</p>
-                      <p>Cost: {formatCost(item.cost)}</p>
-                      <p>Turns: {item.turns}</p>
+                      <p>总 Token: {formatTokens(item.tokens)}</p>
+                      <p>输入: {formatTokens(item.input)}</p>
+                      <p>输出: {formatTokens(item.output)}</p>
+                      <p>费用: {formatCost(item.cost)}</p>
+                      <p>轮次: {item.turns}</p>
                       <p>
-                        Pricing: {item.hasPricing ? "✓ Set" : "✗ Not set"}
+                        定价: {item.hasPricing ? "✓ 已配置" : "✗ 未配置"}
                       </p>
                     </div>
                   );
@@ -153,7 +153,7 @@ export function TokensByModelChart({ byModel, fullWidth }: Props) {
                 verticalAlign="top"
                 height={28}
                 formatter={(value) =>
-                  value === "tokens" ? "Total Tokens" : "Cost ($)"
+                  value === "tokens" ? "总 Token" : "费用 ($)"
                 }
               />
               <Bar xAxisId="tokens" dataKey="tokens" radius={[0, 4, 4, 0]} name="tokens">
@@ -182,7 +182,7 @@ export function TokensByModelChart({ byModel, fullWidth }: Props) {
                   <p className="text-muted-foreground text-xs">
                     {formatCost(item.cost)}
                     {!item.hasPricing && (
-                      <span className="text-yellow-500 ml-1">(no pricing)</span>
+                      <span className="text-yellow-500 ml-1">(未配置单价)</span>
                     )}
                   </p>
                 </div>

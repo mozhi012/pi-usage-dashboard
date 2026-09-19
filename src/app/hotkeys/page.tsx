@@ -62,15 +62,15 @@ export default function HotkeysPage() {
               <Link href="/">
                 <Button variant="ghost" size="sm" className="gap-1.5">
                   <ArrowLeft className="h-4 w-4" />
-                  Dashboard
+                  返回主面板
                 </Button>
               </Link>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                  Hotkeys
+                  快捷键参考
                 </h1>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  All pi keyboard shortcuts
+                  所有 Pi 键盘快捷键一览
                 </p>
               </div>
             </div>
@@ -83,7 +83,7 @@ export default function HotkeysPage() {
               <RefreshCw
                 className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
               />
-              Refresh
+              刷新
             </Button>
           </div>
         </div>
@@ -94,7 +94,7 @@ export default function HotkeysPage() {
           <div className="flex items-center justify-center h-64">
             <div className="flex items-center gap-3 text-muted-foreground">
               <RefreshCw className="h-5 w-5 animate-spin" />
-              <span>Loading hotkeys...</span>
+              <span>正在加载快捷键...</span>
             </div>
           </div>
         ) : (
@@ -106,18 +106,18 @@ export default function HotkeysPage() {
                   <Keyboard className="h-5 w-5 text-chart-2 flex-shrink-0" />
                   <div className="text-sm text-muted-foreground">
                     <p>
-                      {data.hotkeys.length} keybindings across{" "}
-                      {data.categories.length} categories.
+                      共 {data.hotkeys.length} 个快捷键，分布在{" "}
+                      {data.categories.length} 个分类中。
                       {data.hasCustomConfig ? (
                         <span className="ml-1">
-                          Custom config:{" "}
+                          自定义配置文件：{" "}
                           <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">
                             {data.customConfigPath}
                           </code>
                         </span>
                       ) : (
                         <span className="ml-1">
-                          Customize at{" "}
+                          可在此文件自定义：{" "}
                           <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">
                             ~/.pi/agent/keybindings.json
                           </code>
@@ -180,7 +180,7 @@ export default function HotkeysPage() {
                                       variant="outline"
                                       className="text-xs text-chart-2 border-chart-2/30"
                                     >
-                                      Custom
+                                      自定义
                                     </Badge>
                                   </>
                                 ) : hotkey.defaults.length > 0 ? (
@@ -191,7 +191,7 @@ export default function HotkeysPage() {
                                   </div>
                                 ) : (
                                   <span className="text-xs text-muted-foreground italic">
-                                    unbound
+                                    未绑定
                                   </span>
                                 )}
                               </div>

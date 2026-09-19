@@ -80,7 +80,7 @@ export function TokensByDayChart({ byDay, byWeek, byMonth, timeRange, onTimeRang
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold">
-            Token Usage & Cost
+            Token 用量与费用趋势
           </CardTitle>
           <Tabs
             value={range}
@@ -88,13 +88,13 @@ export function TokensByDayChart({ byDay, byWeek, byMonth, timeRange, onTimeRang
           >
             <TabsList className="h-7">
               <TabsTrigger value="daily" className="text-xs px-2 h-5">
-                Daily
+                按天
               </TabsTrigger>
               <TabsTrigger value="weekly" className="text-xs px-2 h-5">
-                Weekly
+                按周
               </TabsTrigger>
               <TabsTrigger value="monthly" className="text-xs px-2 h-5">
-                Monthly
+                按月
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -141,17 +141,17 @@ export function TokensByDayChart({ byDay, byWeek, byMonth, timeRange, onTimeRang
                   color: "var(--popover-foreground)",
                 }}
                 formatter={(value, name) => {
-                  if (name === "cost") return [formatCost(value as number), "Cost"];
-                  return [formatTokens(value as number), name === "input" ? "Input" : "Output"];
+                  if (name === "cost") return [formatCost(value as number), "费用"];
+                  return [formatTokens(value as number), name === "input" ? "输入 Token" : "输出 Token"];
                 }}
               />
               <Legend
                 verticalAlign="top"
                 height={28}
                 formatter={(value) => {
-                  if (value === "input") return "Input Tokens";
-                  if (value === "output") return "Output Tokens";
-                  if (value === "cost") return "Cost";
+                  if (value === "input") return "输入 Token";
+                  if (value === "output") return "输出 Token";
+                  if (value === "cost") return "费用";
                   return value;
                 }}
               />

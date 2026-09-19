@@ -49,19 +49,19 @@ export function ProjectsTable({ byProject }: Props) {
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold">
-          Usage by Project
+          各项目用量明细
         </CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Project</TableHead>
-              <TableHead className="text-right">Tokens</TableHead>
-              <TableHead className="text-right">% of Total</TableHead>
-              <TableHead className="text-right">Cost</TableHead>
-              <TableHead className="text-right">Sessions</TableHead>
-              <TableHead className="text-right">Turns</TableHead>
+              <TableHead>项目</TableHead>
+              <TableHead className="text-right">Token 用量</TableHead>
+              <TableHead className="text-right">总用量占比</TableHead>
+              <TableHead className="text-right">费用</TableHead>
+              <TableHead className="text-right">会话数</TableHead>
+              <TableHead className="text-right">轮次</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>

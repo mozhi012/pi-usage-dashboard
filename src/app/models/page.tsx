@@ -157,7 +157,7 @@ export default function ModelsPage() {
       const res = await fetch("/api/models");
       if (!res.ok) {
         const errData = await res.json();
-        setError(errData.error || "Failed to load models");
+        setError(errData.error || "加载模型失败");
         return;
       }
       const json = await res.json();
@@ -224,7 +224,7 @@ export default function ModelsPage() {
 
       const responseData = await res.json();
       if (!res.ok) {
-        setProviderError(responseData.error || "Failed to save provider");
+        setProviderError(responseData.error || "保存提供商失败");
         return;
       }
 
@@ -238,7 +238,7 @@ export default function ModelsPage() {
   };
 
   const handleDeleteProvider = async (name: string) => {
-    if (!confirm(`Delete provider "${name}" and all its models? This cannot be undone.`)) return;
+    if (!confirm(`确认删除提供商 "${name}" 及其所有模型吗？此操作无法撤销。`)) return;
     setError(null);
     try {
       const res = await fetch(`/api/models?provider=${encodeURIComponent(name)}`, {
@@ -246,7 +246,7 @@ export default function ModelsPage() {
       });
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || "Failed to delete provider");
+        setError(data.error || "删除提供商失败");
         return;
       }
       await fetchData();
@@ -293,7 +293,7 @@ export default function ModelsPage() {
       const action = isNew ? "add-model" : "update-model";
 
       if (isNew && !modelForm.id.trim()) {
-        setModelError("Model ID is required");
+        setModelError("模型 ID 不能为空");
         return;
       }
 
@@ -341,7 +341,7 @@ export default function ModelsPage() {
 
       const responseData = await res.json();
       if (!res.ok) {
-        setModelError(responseData.error || "Failed to save model");
+        setModelError(responseData.error || "保存模型失败");
         return;
       }
 
@@ -355,7 +355,7 @@ export default function ModelsPage() {
   };
 
   const handleDeleteModel = async (provider: string, modelId: string) => {
-    if (!confirm(`Delete model "${modelId}" from "${provider}"?`)) return;
+    if (!confirm(`确认从 "${provider}" 中删除模型 "${modelId}" 吗？`)) return;
     setError(null);
     try {
       const res = await fetch(`/api/models?provider=${encodeURIComponent(provider)}&modelId=${encodeURIComponent(modelId)}`, {
@@ -363,7 +363,7 @@ export default function ModelsPage() {
       });
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || "Failed to delete model");
+        setError(data.error || "删除模型失败");
         return;
       }
       await fetchData();
@@ -381,22 +381,22 @@ export default function ModelsPage() {
               <Link href="/">
                 <Button variant="ghost" size="sm" className="gap-1.5">
                   <ArrowLeft className="h-4 w-4" />
-                  Dashboard
+                  返回主面板
                 </Button>
               </Link>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                  Models & Providers
+                  模型与提供商
                 </h1>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Manage custom providers and models (edit custom, built-in are read-only)
+                  管理自定义提供商与模型（支持编辑自定义项，内置模型为只读）
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Button onClick={openAddProvider} className="gap-1.5">
                 <Plus className="h-4 w-4" />
-                Add Provider
+                添加提供商
               </Button>
               <Button
                 onClick={fetchData}
@@ -405,7 +405,7 @@ export default function ModelsPage() {
                 className="gap-1.5"
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                Refresh
+                刷新
               </Button>
             </div>
           </div>
@@ -423,7 +423,7 @@ export default function ModelsPage() {
           <div className="flex items-center justify-center h-64">
             <div className="flex items-center gap-3 text-muted-foreground">
               <RefreshCw className="h-5 w-5 animate-spin" />
-              <span>Loading models...</span>
+              <span>正在加载模型...</span>
             </div>
           </div>
         ) : (
@@ -433,7 +433,7 @@ export default function ModelsPage() {
               <Card>
                 <CardContent className="pt-5 pb-4 px-5">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Models</span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">模型总数</span>
                     <Cpu className="h-4 w-4 text-chart-1" />
                   </div>
                   <div className="text-2xl font-bold">{data.totalModels}</div>
@@ -442,7 +442,7 @@ export default function ModelsPage() {
               <Card>
                 <CardContent className="pt-5 pb-4 px-5">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Providers</span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">提供商</span>
                     <Server className="h-4 w-4 text-chart-2" />
                   </div>
                   <div className="text-2xl font-bold">{data.totalProviders}</div>
@@ -451,7 +451,7 @@ export default function ModelsPage() {
               <Card>
                 <CardContent className="pt-5 pb-4 px-5">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Default</span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">默认模型</span>
                     <Star className="h-4 w-4 text-chart-5" />
                   </div>
                   <div className="text-sm font-bold font-mono truncate">
@@ -462,11 +462,11 @@ export default function ModelsPage() {
               <Card>
                 <CardContent className="pt-5 pb-4 px-5">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Auth Entries</span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">认证凭据</span>
                     <Key className="h-4 w-4 text-chart-4" />
                   </div>
                   <div className="text-2xl font-bold">{data.authProviders.length}</div>
-                  <p className="text-xs text-muted-foreground mt-0.5">in auth.json</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">保存在 auth.json</p>
                 </CardContent>
               </Card>
             </div>
@@ -477,7 +477,7 @@ export default function ModelsPage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
                     <Key className="h-4 w-4" />
-                    Authentication
+                    认证凭据配置
                     <span className="text-sm font-normal text-muted-foreground">(~/.pi/agent/auth.json)</span>
                   </CardTitle>
                 </CardHeader>
@@ -499,11 +499,11 @@ export default function ModelsPage() {
               <TabsList>
                 <TabsTrigger value="providers" className="gap-1.5">
                   <Server className="h-3.5 w-3.5" />
-                  Providers ({data.totalProviders})
+                  按提供商 ({data.totalProviders})
                 </TabsTrigger>
                 <TabsTrigger value="models" className="gap-1.5">
                   <Cpu className="h-3.5 w-3.5" />
-                  All Models ({data.totalModels})
+                  全部模型 ({data.totalModels})
                 </TabsTrigger>
               </TabsList>
 
@@ -520,10 +520,10 @@ export default function ModelsPage() {
                               <Server className="h-4 w-4" />
                               {name}
                               {name === data.defaultProvider && (
-                                <Badge className="text-xs bg-chart-5/20 text-chart-5 border-chart-5/30">Default</Badge>
+                                <Badge className="text-xs bg-chart-5/20 text-chart-5 border-chart-5/30">默认</Badge>
                               )}
                               {isCustom && (
-                                <Badge variant="outline" className="text-xs text-chart-2 border-chart-2/30">Custom</Badge>
+                                <Badge variant="outline" className="text-xs text-chart-2 border-chart-2/30">自定义</Badge>
                               )}
                             </CardTitle>
                           </div>
@@ -531,16 +531,16 @@ export default function ModelsPage() {
                             {provider.hasAuth ? (
                               <Badge variant="outline" className="text-xs gap-1 text-green-600 border-green-600/30">
                                 {provider.authType === "oauth" ? <Shield className="h-3 w-3" /> : <Key className="h-3 w-3" />}
-                                {provider.authType === "oauth" ? "OAuth" : "API Key"}
+                                {provider.authType === "oauth" ? "OAuth" : "API 密钥"}
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-xs gap-1 text-red-500 border-red-500/30">
                                 <ShieldOff className="h-3 w-3" />
-                                No Auth
+                                无凭据
                               </Badge>
                             )}
                             <Badge variant="secondary" className="text-xs">
-                              {provider.modelCount} models
+                              {provider.modelCount} 个模型
                             </Badge>
                             {isCustom && (
                               <>
@@ -564,36 +564,36 @@ export default function ModelsPage() {
                         {provider.baseUrl && (
                           <div className="mb-4 grid grid-cols-[1fr_auto_auto_auto] gap-4 text-sm items-center">
                             <div>
-                              <span className="text-xs text-muted-foreground">Base URL</span>
+                              <span className="text-xs text-muted-foreground">接口地址 (Base URL)</span>
                               <p className="font-mono text-xs mt-0.5 truncate max-w-[400px]">{provider.baseUrl}</p>
                             </div>
                             <div>
-                              <span className="text-xs text-muted-foreground">API Type</span>
+                              <span className="text-xs text-muted-foreground">接口类型 (API Type)</span>
                               <p className="font-mono text-xs mt-0.5">{provider.api}</p>
                             </div>
                           </div>
                         )}
                         <div className="mb-3 flex items-center justify-between">
                           <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                            Models ({providerModels.length})
+                            模型列表 ({providerModels.length})
                           </span>
                           {isCustom && (
                             <Button variant="outline" size="sm" className="text-xs gap-1" onClick={() => openAddModel(name)}>
                               <Plus className="h-3 w-3" />
-                              Add Model
+                              添加模型
                             </Button>
                           )}
                         </div>
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Model ID</TableHead>
-                              <TableHead>Name</TableHead>
-                              <TableHead className="text-right">Context</TableHead>
-                              <TableHead className="text-right">Max Output</TableHead>
-                              <TableHead className="text-right">Cost ($/1M)</TableHead>
-                              <TableHead className="text-center">Features</TableHead>
-                              {isCustom && <TableHead className="text-right w-20">Actions</TableHead>}
+                              <TableHead>模型 ID</TableHead>
+                              <TableHead>名称</TableHead>
+                              <TableHead className="text-right">上下文窗口</TableHead>
+                              <TableHead className="text-right">最大输出</TableHead>
+                              <TableHead className="text-right">单价 ($/1M)</TableHead>
+                              <TableHead className="text-center">特性</TableHead>
+                              {isCustom && <TableHead className="text-right w-20">操作</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -618,13 +618,13 @@ export default function ModelsPage() {
                                 <TableCell className="text-center">
                                   <div className="flex items-center justify-center gap-1.5">
                                     {model.reasoning && (
-                                      <Badge variant="outline" className="text-xs gap-0.5"><Brain className="h-3 w-3" /> Think</Badge>
+                                      <Badge variant="outline" className="text-xs gap-0.5"><Brain className="h-3 w-3" /> 思考</Badge>
                                     )}
                                     {model.images && (
-                                      <Badge variant="outline" className="text-xs gap-0.5"><Image className="h-3 w-3" /> Vision</Badge>
+                                      <Badge variant="outline" className="text-xs gap-0.5"><Image className="h-3 w-3" /> 视觉</Badge>
                                     )}
                                     {!model.reasoning && !model.images && (
-                                      <span className="text-xs text-muted-foreground">Text</span>
+                                      <span className="text-xs text-muted-foreground">文本</span>
                                     )}
                                   </div>
                                 </TableCell>
@@ -659,7 +659,7 @@ export default function ModelsPage() {
                 <Card>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-semibold">All Models</CardTitle>
+                      <CardTitle className="text-base font-semibold">全部模型</CardTitle>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Button
                           variant={selectedProvider === null ? "default" : "outline"}
@@ -667,7 +667,7 @@ export default function ModelsPage() {
                           className="text-xs"
                           onClick={() => setSelectedProvider(null)}
                         >
-                          All ({data.totalModels})
+                          全部 ({data.totalModels})
                         </Button>
                         {Object.entries(data.providers).map(([p, info]) => (
                           <Button
@@ -687,15 +687,15 @@ export default function ModelsPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Source</TableHead>
-                          <TableHead>Provider</TableHead>
-                          <TableHead>Model ID</TableHead>
-                          <TableHead className="text-right">Context</TableHead>
-                          <TableHead className="text-right">Max Output</TableHead>
-                          <TableHead className="text-right">Cost In/Out ($/1M)</TableHead>
-                          <TableHead className="text-center">Reasoning</TableHead>
-                          <TableHead className="text-center">Vision</TableHead>
-                          <TableHead className="text-right w-20">Actions</TableHead>
+                          <TableHead>来源</TableHead>
+                          <TableHead>提供商</TableHead>
+                          <TableHead>模型 ID</TableHead>
+                          <TableHead className="text-right">上下文窗口</TableHead>
+                          <TableHead className="text-right">最大输出</TableHead>
+                          <TableHead className="text-right">单价 输入/输出 ($/1M)</TableHead>
+                          <TableHead className="text-center">深度思考</TableHead>
+                          <TableHead className="text-center">视觉能力</TableHead>
+                          <TableHead className="text-right w-20">操作</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -703,9 +703,9 @@ export default function ModelsPage() {
                           <TableRow key={`${model.provider}/${model.id}`}>
                             <TableCell>
                               {model.source === "custom" ? (
-                                <Badge variant="outline" className="text-xs text-chart-2 border-chart-2/30">Custom</Badge>
+                                <Badge variant="outline" className="text-xs text-chart-2 border-chart-2/30">自定义</Badge>
                               ) : model.source === "builtin" ? (
-                                <Badge variant="secondary" className="text-xs">Built-in</Badge>
+                                <Badge variant="secondary" className="text-xs">内置</Badge>
                               ) : (
                                 <Badge variant="outline" className="text-xs">CLI</Badge>
                               )}
@@ -767,44 +767,44 @@ export default function ModelsPage() {
       <Dialog open={providerDialogOpen} onOpenChange={(open) => { if (!open) setProviderDialogOpen(false); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingProvider ? `Edit Provider: ${editingProvider}` : "Add Provider"}</DialogTitle>
+            <DialogTitle>{editingProvider ? `编辑提供商: ${editingProvider}` : "添加提供商"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             {!editingProvider && (
               <div>
-                <Label className="text-xs">Provider Name</Label>
+                <Label className="text-xs">提供商名称</Label>
                 <Input
                   value={providerForm.name}
                   onChange={(e) => setProviderForm({ ...providerForm, name: e.target.value })}
-                  placeholder="e.g. my-custom-provider"
+                  placeholder="例如: my-custom-provider"
                   className="mt-1 font-mono text-sm"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Used as the key in models.json</p>
+                <p className="text-xs text-muted-foreground mt-1">作为 models.json 中的唯一键名</p>
               </div>
             )}
             <div>
-              <Label className="text-xs">Base URL</Label>
+              <Label className="text-xs">基础接口地址 (Base URL)</Label>
               <Input
                 value={providerForm.baseUrl}
                 onChange={(e) => setProviderForm({ ...providerForm, baseUrl: e.target.value })}
-                placeholder="e.g. https://api.openai.com/v1"
+                placeholder="例如: https://api.openai.com/v1"
                 className="mt-1 font-mono text-sm"
               />
             </div>
             <div>
-              <Label className="text-xs">API Type</Label>
+              <Label className="text-xs">接口类型 (API Type)</Label>
               <Input
                 value={providerForm.api}
                 onChange={(e) => setProviderForm({ ...providerForm, api: e.target.value })}
-                placeholder="e.g. openai, anthropic, custom"
+                placeholder="例如: openai, anthropic, custom"
                 className="mt-1 font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Determines how pi calls the API (openai, anthropic, vertex, custom, etc.)
+                决定 Pi 如何发起请求协议 (openai, anthropic, vertex, custom 等)
               </p>
             </div>
             <div>
-              <Label className="text-xs">API Key {editingProvider ? "(leave blank to keep existing)" : "(optional)"}</Label>
+              <Label className="text-xs">API 密钥 {editingProvider ? "(留空则保持现有密钥)" : "(可选)"}</Label>
               <Input
                 type="password"
                 value={providerForm.apiKey}
@@ -812,7 +812,7 @@ export default function ModelsPage() {
                 placeholder={editingProvider ? "••••••••" : "sk-..."}
                 className="mt-1 font-mono text-sm"
               />
-              <p className="text-xs text-muted-foreground mt-1">Stored in models.json, used by pi for authentication</p>
+              <p className="text-xs text-muted-foreground mt-1">保存于 models.json，用于 Pi 鉴权访问</p>
             </div>
 
             {providerError && (
@@ -820,10 +820,10 @@ export default function ModelsPage() {
             )}
 
             <div className="flex justify-end gap-2 pt-2">
-              <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+              <DialogClose><Button variant="outline">取消</Button></DialogClose>
               <Button onClick={handleSaveProvider} disabled={providerSaving || (!editingProvider && !providerForm.name)} className="gap-1.5">
                 <Save className="h-4 w-4" />
-                {providerSaving ? "Saving..." : "Save"}
+                {providerSaving ? "正在保存..." : "保存"}
               </Button>
             </div>
           </div>
@@ -835,47 +835,47 @@ export default function ModelsPage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {editingModelId ? `Edit Model: ${editingModelId}` : `Add Model to "${modelProvider}"`}
+              {editingModelId ? `编辑模型: ${editingModelId}` : `为 "${modelProvider}" 添加模型`}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2 max-h-[65vh] overflow-y-auto pr-1">
             <div>
-              <Label className="text-xs">Model ID <span className="text-destructive">*</span></Label>
+              <Label className="text-xs">模型 ID <span className="text-destructive">*</span></Label>
               <Input
                 value={modelForm.id}
                 onChange={(e) => setModelForm({ ...modelForm, id: e.target.value })}
-                placeholder="e.g. gpt-4o-mini"
+                placeholder="例如: gpt-4o-mini"
                 className="mt-1 font-mono text-sm"
               />
             </div>
             <div>
-              <Label className="text-xs">Display Name (optional)</Label>
+              <Label className="text-xs">显示名称 (可选)</Label>
               <Input
                 value={modelForm.name}
                 onChange={(e) => setModelForm({ ...modelForm, name: e.target.value })}
-                placeholder="Defaults to Model ID"
+                placeholder="默认为模型 ID"
                 className="mt-1 font-mono text-sm"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">Context Window</Label>
+                <Label className="text-xs">上下文窗口 (Tokens)</Label>
                 <Input
                   type="number" min="0" step="1000"
                   value={modelForm.contextWindow}
                   onChange={(e) => setModelForm({ ...modelForm, contextWindow: e.target.value })}
-                  placeholder="e.g. 128000"
+                  placeholder="例如: 128000"
                   className="mt-1 font-mono text-sm"
                 />
               </div>
               <div>
-                <Label className="text-xs">Max Tokens</Label>
+                <Label className="text-xs">最大输出 (Tokens)</Label>
                 <Input
                   type="number" min="0" step="1000"
                   value={modelForm.maxTokens}
                   onChange={(e) => setModelForm({ ...modelForm, maxTokens: e.target.value })}
-                  placeholder="e.g. 16384"
+                  placeholder="例如: 16384"
                   className="mt-1 font-mono text-sm"
                 />
               </div>
@@ -891,7 +891,7 @@ export default function ModelsPage() {
                 />
                 <span className="text-sm flex items-center gap-1">
                   <Brain className="h-3.5 w-3.5 text-chart-2" />
-                  Reasoning
+                  深度思考 (Reasoning)
                 </span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -903,16 +903,16 @@ export default function ModelsPage() {
                 />
                 <span className="text-sm flex items-center gap-1">
                   <Image className="h-3.5 w-3.5 text-chart-4" />
-                  Vision
+                  视觉识别 (Vision)
                 </span>
               </label>
             </div>
 
             <div className="border-t pt-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Cost per 1M tokens</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">每 100 万 Token 单价 (美元)</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">Input ($)</Label>
+                  <Label className="text-xs">提示词输入 ($)</Label>
                   <Input type="number" step="0.01" min="0"
                     value={modelForm.costInput}
                     onChange={(e) => setModelForm({ ...modelForm, costInput: e.target.value })}
@@ -921,7 +921,7 @@ export default function ModelsPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Output ($)</Label>
+                  <Label className="text-xs">模型输出 ($)</Label>
                   <Input type="number" step="0.01" min="0"
                     value={modelForm.costOutput}
                     onChange={(e) => setModelForm({ ...modelForm, costOutput: e.target.value })}
@@ -930,7 +930,7 @@ export default function ModelsPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Cache Read ($)</Label>
+                  <Label className="text-xs">缓存读取 ($)</Label>
                   <Input type="number" step="0.01" min="0"
                     value={modelForm.costCacheRead}
                     onChange={(e) => setModelForm({ ...modelForm, costCacheRead: e.target.value })}
@@ -939,7 +939,7 @@ export default function ModelsPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Cache Write ($)</Label>
+                  <Label className="text-xs">缓存写入 ($)</Label>
                   <Input type="number" step="0.01" min="0"
                     value={modelForm.costCacheWrite}
                     onChange={(e) => setModelForm({ ...modelForm, costCacheWrite: e.target.value })}
@@ -955,10 +955,10 @@ export default function ModelsPage() {
             )}
 
             <div className="flex justify-end gap-2 pt-2 border-t">
-              <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+              <DialogClose><Button variant="outline">取消</Button></DialogClose>
               <Button onClick={handleSaveModel} disabled={modelSaving || (!editingModelId && !modelForm.id.trim())} className="gap-1.5">
                 <Save className="h-4 w-4" />
-                {modelSaving ? "Saving..." : "Save"}
+                {modelSaving ? "正在保存..." : "保存"}
               </Button>
             </div>
           </div>

@@ -100,9 +100,10 @@ export default function ExtensionsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setNotification({ type: "error", message: data.error || "Failed to delete" });
+        setNotification({ type: "error", message: data.error || "删除失败" });
       } else {
-        setNotification({ type: "success", message: `Removed ${deleteTarget.type}: ${deleteTarget.name}` });
+        const typeLabel = deleteTarget.type === "extension" ? "扩展" : deleteTarget.type === "skill" ? "技能" : deleteTarget.type === "prompt" ? "提示词模板" : "主题";
+        setNotification({ type: "success", message: `已移除${typeLabel}：${deleteTarget.name}` });
         await fetchItems();
       }
     } catch (err) {
@@ -118,18 +119,18 @@ export default function ExtensionsPage() {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Source</TableHead>
-          <TableHead>Description</TableHead>
-          <TableHead>Path</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
+          <TableHead>名称</TableHead>
+          <TableHead>来源</TableHead>
+          <TableHead>描述</TableHead>
+          <TableHead>路径</TableHead>
+          <TableHead className="text-right">操作</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {resourceItems.length === 0 ? (
           <TableRow>
             <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-              None found
+              暂无数据
             </TableCell>
           </TableRow>
         ) : (
@@ -144,7 +145,7 @@ export default function ExtensionsPage() {
                   </Badge>
                 ) : (
                   <Badge variant="secondary" className="text-xs">
-                    Global
+                    全局
                   </Badge>
                 )}
               </TableCell>
@@ -180,15 +181,15 @@ export default function ExtensionsPage() {
               <Link href="/">
                 <Button variant="ghost" size="sm" className="gap-1.5">
                   <ArrowLeft className="h-4 w-4" />
-                  Dashboard
+                  返回主面板
                 </Button>
               </Link>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                  Extensions & Skills
+                  扩展与技能
                 </h1>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  All globally available pi resources
+                  所有全局可用的 Pi 资源
                 </p>
               </div>
             </div>
@@ -201,7 +202,7 @@ export default function ExtensionsPage() {
               <RefreshCw
                 className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
               />
-              Refresh
+              刷新
             </Button>
           </div>
         </div>
@@ -214,7 +215,7 @@ export default function ExtensionsPage() {
             <CardContent className="pt-5 pb-4 px-5">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Extensions
+                  扩展 (Extensions)
                 </span>
                 <Puzzle className="h-4 w-4 text-chart-1" />
               </div>
@@ -225,7 +226,7 @@ export default function ExtensionsPage() {
             <CardContent className="pt-5 pb-4 px-5">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Skills
+                  技能 (Skills)
                 </span>
                 <BookOpen className="h-4 w-4 text-chart-2" />
               </div>
@@ -236,7 +237,7 @@ export default function ExtensionsPage() {
             <CardContent className="pt-5 pb-4 px-5">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Prompts
+                  提示词 (Prompts)
                 </span>
                 <FileText className="h-4 w-4 text-chart-4" />
               </div>
@@ -247,7 +248,7 @@ export default function ExtensionsPage() {
             <CardContent className="pt-5 pb-4 px-5">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Themes
+                  主题 (Themes)
                 </span>
                 <Palette className="h-4 w-4 text-chart-5" />
               </div>
@@ -263,19 +264,19 @@ export default function ExtensionsPage() {
               <TabsList>
                 <TabsTrigger value="extensions" className="gap-1.5">
                   {typeIcon("extension")}
-                  Extensions ({extensions.length})
+                  扩展 ({extensions.length})
                 </TabsTrigger>
                 <TabsTrigger value="skills" className="gap-1.5">
                   {typeIcon("skill")}
-                  Skills ({skills.length})
+                  技能 ({skills.length})
                 </TabsTrigger>
                 <TabsTrigger value="prompts" className="gap-1.5">
                   {typeIcon("prompt")}
-                  Prompts ({prompts.length})
+                  提示词 ({prompts.length})
                 </TabsTrigger>
                 <TabsTrigger value="themes" className="gap-1.5">
                   {typeIcon("theme")}
-                  Themes ({themes.length})
+                  主题 ({themes.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -319,35 +320,35 @@ export default function ExtensionsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Remove {deleteTarget?.type}?
+              确认移除{deleteTarget?.type === "skill" ? "技能" : deleteTarget?.type === "extension" ? "扩展" : deleteTarget?.type === "prompt" ? "提示词模板" : "主题"}？
             </DialogTitle>
           </DialogHeader>
           {deleteTarget && (
             <div className="space-y-4 pt-2">
               <div className="rounded-md bg-muted/50 p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Name</span>
+                  <span className="text-xs text-muted-foreground">名称</span>
                   <span className="font-medium text-sm">{deleteTarget.name}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Type</span>
+                  <span className="text-xs text-muted-foreground">类型</span>
                   <Badge variant="outline" className="text-xs">
-                    {deleteTarget.type}
+                    {deleteTarget.type === "skill" ? "技能 (skill)" : deleteTarget.type === "extension" ? "扩展 (extension)" : deleteTarget.type === "prompt" ? "提示词 (prompt)" : "主题 (theme)"}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Source</span>
+                  <span className="text-xs text-muted-foreground">来源</span>
                   <Badge
                     variant={deleteTarget.scope === "package" ? "outline" : "secondary"}
                     className="text-xs"
                   >
                     {deleteTarget.scope === "package"
                       ? deleteTarget.packageName || "package"
-                      : "Global"}
+                      : "全局"}
                   </Badge>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground">Path</span>
+                  <span className="text-xs text-muted-foreground">路径</span>
                   <p className="font-mono text-xs mt-0.5 break-all">
                     {deleteTarget.path}
                   </p>
@@ -355,8 +356,7 @@ export default function ExtensionsPage() {
               </div>
 
               <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-                This will permanently delete the {deleteTarget.type === "skill" ? "skill directory" : "file"} from disk.
-                This action cannot be undone.
+                此操作将从磁盘永久删除该{deleteTarget.type === "skill" ? "技能目录" : "文件"}，无法撤销。
               </div>
 
               <div className="flex justify-end gap-2">
@@ -364,7 +364,7 @@ export default function ExtensionsPage() {
                   variant="outline"
                   onClick={() => setDeleteTarget(null)}
                 >
-                  Cancel
+                  取消
                 </Button>
                 <Button
                   variant="destructive"
@@ -373,7 +373,7 @@ export default function ExtensionsPage() {
                   className="gap-1.5"
                 >
                   <Trash2 className="h-4 w-4" />
-                  {deleting ? "Removing..." : "Remove"}
+                  {deleting ? "正在移除..." : "确认移除"}
                 </Button>
               </div>
             </div>

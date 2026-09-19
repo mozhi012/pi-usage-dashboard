@@ -71,10 +71,10 @@ function timeAgo(timestamp: number): string {
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
 
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  if (hours < 24) return `${hours} 小时前`;
+  if (days < 7) return `${days} 天前`;
   return formatDate(timestamp);
 }
 
@@ -110,7 +110,7 @@ export function SessionsTable({ sessions }: Props) {
       const data = await res.json();
 
       if (!res.ok) {
-        setActionResult({ type: "error", message: data.error || "Failed to launch terminal" });
+        setActionResult({ type: "error", message: data.error || "启动终端失败" });
         return;
       }
 
@@ -141,11 +141,11 @@ export function SessionsTable({ sessions }: Props) {
       const data = await res.json();
 
       if (!res.ok) {
-        setActionResult({ type: "error", message: data.error || "Failed" });
+        setActionResult({ type: "error", message: data.error || "操作失败" });
       } else {
         setActionResult({
           type: "success",
-          message: data.message || "Done!",
+          message: data.message || "完成！",
         });
       }
     } catch (err) {
@@ -160,9 +160,9 @@ export function SessionsTable({ sessions }: Props) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold">
-            All Sessions
+            全部会话
             <span className="ml-2 text-sm font-normal text-muted-foreground">
-              ({sessions.length} total, sorted by last activity)
+              (共 {sessions.length} 个，按最近活跃时间排序)
             </span>
           </CardTitle>
         </CardHeader>
@@ -171,14 +171,14 @@ export function SessionsTable({ sessions }: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Last Active</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Models</TableHead>
-                  <TableHead className="text-right">Tokens</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
-                  <TableHead className="text-right">User</TableHead>
-                  <TableHead className="text-right">Assistant</TableHead>
+                  <TableHead>最近活跃</TableHead>
+                  <TableHead>创建时间</TableHead>
+                  <TableHead>所属项目</TableHead>
+                  <TableHead>模型</TableHead>
+                  <TableHead className="text-right">Token 用量</TableHead>
+                  <TableHead className="text-right">费用</TableHead>
+                  <TableHead className="text-right">用户</TableHead>
+                  <TableHead className="text-right">助手</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -256,21 +256,21 @@ export function SessionsTable({ sessions }: Props) {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Session Actions</DialogTitle>
+            <DialogTitle>会话操作</DialogTitle>
           </DialogHeader>
           {selectedSession && (
             <div className="space-y-4 pt-2 max-h-[70vh] overflow-y-auto">
               {/* Session info */}
               <div className="rounded-md bg-muted/50 p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Project</span>
+                  <span className="text-xs text-muted-foreground">所属项目</span>
                   <span className="font-mono text-xs">
                     {selectedSession.project}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
-                    Last Active
+                    最近活跃
                   </span>
                   <span className="text-sm font-medium">
                     {timeAgo(selectedSession.lastInteraction)}
@@ -278,7 +278,7 @@ export function SessionsTable({ sessions }: Props) {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
-                    Session ID
+                    会话 ID
                   </span>
                   <span className="font-mono text-xs">
                     {selectedSession.sessionId.slice(0, 12)}…
@@ -298,8 +298,8 @@ export function SessionsTable({ sessions }: Props) {
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {selectedSession.userTurns} user /{" "}
-                    {selectedSession.assistantTurns} assistant turns
+                    {selectedSession.userTurns} 用户 /{" "}
+                    {selectedSession.assistantTurns} 助手轮次
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1 pt-1">
@@ -324,9 +324,9 @@ export function SessionsTable({ sessions }: Props) {
                 >
                   <Play className="h-5 w-5" />
                   <div className="text-center">
-                    <p className="font-medium">Resume</p>
+                    <p className="font-medium">继续会话</p>
                     <p className="text-xs opacity-80">
-                      Continue this session
+                      在终端中恢复此会话
                     </p>
                   </div>
                 </Button>
@@ -338,9 +338,9 @@ export function SessionsTable({ sessions }: Props) {
                 >
                   <GitFork className="h-5 w-5" />
                   <div className="text-center">
-                    <p className="font-medium">Fork</p>
+                    <p className="font-medium">分叉会话</p>
                     <p className="text-xs opacity-80">
-                      Branch into new session
+                      创建新分支会话
                     </p>
                   </div>
                 </Button>
@@ -356,7 +356,7 @@ export function SessionsTable({ sessions }: Props) {
                   disabled={launching}
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Export HTML
+                  导出 HTML
                 </Button>
                 <Button
                   variant="outline"
@@ -366,7 +366,7 @@ export function SessionsTable({ sessions }: Props) {
                   disabled={launching}
                 >
                   <Share2 className="h-3.5 w-3.5" />
-                  Share (Gist)
+                  分享 (Gist)
                 </Button>
                 <Button
                   variant="outline"
@@ -376,7 +376,7 @@ export function SessionsTable({ sessions }: Props) {
                   disabled={launching}
                 >
                   <Copy className="h-3.5 w-3.5" />
-                  Duplicate
+                  复制会话
                 </Button>
               </div>
 
@@ -394,7 +394,7 @@ export function SessionsTable({ sessions }: Props) {
 
               <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
                 <Terminal className="h-3.5 w-3.5" />
-                Resume/Fork opens a new terminal window with pi
+                继续/分叉会话将在新终端窗口中启动 pi
               </p>
             </div>
           )}

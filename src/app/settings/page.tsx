@@ -60,7 +60,7 @@ export default function SettingsPage() {
     setSuccess("");
 
     if (!newPath.trim()) {
-      setError("Path is required");
+      setError("路径不能为空");
       return;
     }
 
@@ -75,11 +75,11 @@ export default function SettingsPage() {
 
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error || "Failed to add source");
+      setError(data.error || "添加数据源失败");
       return;
     }
 
-    setSuccess("Source added! Click Sync on the dashboard to refresh data.");
+    setSuccess("数据源添加成功！可在主面板点击“同步数据”刷新。");
     setNewPath("");
     setNewLabel("");
     await fetchSources();
@@ -90,10 +90,10 @@ export default function SettingsPage() {
     setSyncing(true);
     try {
       await fetch("/api/usage");
-      setSuccess("Synced! Dashboard data refreshed with all sources.");
+      setSuccess("同步完成！主面板已更新所有数据源会话。");
       setTimeout(() => setSuccess(""), 3000);
     } catch {
-      setError("Sync failed");
+      setError("同步失败");
     } finally {
       setSyncing(false);
     }
@@ -122,15 +122,15 @@ export default function SettingsPage() {
               <Link href="/">
                 <Button variant="ghost" size="sm" className="gap-1.5">
                   <ArrowLeft className="h-4 w-4" />
-                  Dashboard
+                  返回主面板
                 </Button>
               </Link>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                  Session Sources
+                  会话数据源设置
                 </h1>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Configure where to find pi session data
+                  配置 Pi 会话日志的扫描路径
                 </p>
               </div>
             </div>
@@ -142,7 +142,7 @@ export default function SettingsPage() {
               <RefreshCw
                 className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`}
               />
-              Sync Now
+              立即同步
             </Button>
           </div>
         </div>
@@ -156,21 +156,16 @@ export default function SettingsPage() {
               <Info className="h-5 w-5 text-chart-2 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-muted-foreground space-y-2">
                 <p>
-                  The dashboard always reads from the default pi sessions
-                  directory:{" "}
+                  仪表盘始终会自动读取默认的 Pi 会话目录：{" "}
                   <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">
                     ~/.pi/agent/sessions/
                   </code>
                 </p>
                 <p>
-                  Add additional session source paths below to merge data from
-                  other tools or harnesses that store pi-compatible JSONL
-                  sessions (e.g., Superconductor, custom wrappers, team shared
-                  directories).
+                  可在下方添加其它会话来源路径，合并来自其它兼容工具或运行环境的 JSONL 会话记录（例如 Superconductor、自定义封装脚本、团队共享目录等）。
                 </p>
                 <p>
-                  Sessions are deduplicated by session ID — if the same session
-                  appears in multiple sources, it&apos;s only counted once.
+                  系统会根据会话 ID 自动去重——同一会话即使出现在多个数据源中，也只会被计算一次。
                 </p>
               </div>
             </div>
@@ -182,14 +177,14 @@ export default function SettingsPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Plus className="h-4 w-4" />
-              Add Session Source
+              添加会话数据源
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div>
                 <Label className="text-xs">
-                  Path to sessions directory
+                  会话目录绝对或相对路径
                 </Label>
                 <Input
                   value={newPath}
@@ -197,20 +192,19 @@ export default function SettingsPage() {
                     setNewPath(e.target.value);
                     setError("");
                   }}
-                  placeholder="e.g. ~/.superconductor/sessions/pi/"
+                  placeholder="例如: ~/.superconductor/sessions/pi/"
                   className="mt-1 font-mono text-sm"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  The directory will be recursively scanned for .jsonl session
-                  files
+                  系统将递归扫描该路径下的 .jsonl 会话文件
                 </p>
               </div>
               <div>
-                <Label className="text-xs">Label (optional)</Label>
+                <Label className="text-xs">标签备注 (可选)</Label>
                 <Input
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
-                  placeholder="e.g. Superconductor, Work laptop, Team shared"
+                  placeholder="例如: Superconductor, 工作电脑, 团队共享"
                   className="mt-1"
                 />
               </div>
@@ -228,7 +222,7 @@ export default function SettingsPage() {
 
               <Button onClick={handleAdd} className="gap-1.5">
                 <FolderOpen className="h-4 w-4" />
-                Add Source
+                添加数据源
               </Button>
             </div>
           </CardContent>
@@ -239,7 +233,7 @@ export default function SettingsPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <FolderOpen className="h-4 w-4" />
-              Configured Sources
+              已配置的数据源
               <Badge variant="secondary" className="ml-1">
                 {sources.length}
               </Badge>
@@ -248,19 +242,19 @@ export default function SettingsPage() {
           <CardContent>
             {sources.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <p>No additional sources configured.</p>
+                <p>未配置附加数据源。</p>
                 <p className="text-sm mt-1">
-                  Only the default pi sessions directory is being scanned.
+                  当前仅扫描默认的 Pi 会话目录。
                 </p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Label</TableHead>
-                    <TableHead>Path</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>标签备注</TableHead>
+                    <TableHead>路径</TableHead>
+                    <TableHead className="text-center">状态</TableHead>
+                    <TableHead className="text-right">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -278,11 +272,11 @@ export default function SettingsPage() {
                             variant="default"
                             className="bg-green-600 text-xs"
                           >
-                            Active
+                            已启用
                           </Badge>
                         ) : (
                           <Badge variant="secondary" className="text-xs">
-                            Disabled
+                            已停用
                           </Badge>
                         )}
                       </TableCell>
@@ -293,7 +287,7 @@ export default function SettingsPage() {
                             size="sm"
                             onClick={() => handleToggle(source)}
                             title={
-                              source.enabled ? "Disable" : "Enable"
+                              source.enabled ? "停用" : "启用"
                             }
                           >
                             {source.enabled ? (
@@ -324,20 +318,20 @@ export default function SettingsPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
-              Common Session Paths
+              常见会话路径参考
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between rounded-md bg-muted/50 p-3">
                 <div>
-                  <p className="font-medium">Pi (default)</p>
+                  <p className="font-medium">Pi (默认)</p>
                   <code className="text-xs font-mono text-muted-foreground">
                     ~/.pi/agent/sessions/
                   </code>
                 </div>
                 <Badge variant="outline" className="text-xs">
-                  Always included
+                  始终包含
                 </Badge>
               </div>
               <div className="flex items-center justify-between rounded-md bg-muted/50 p-3">
@@ -356,7 +350,7 @@ export default function SettingsPage() {
                     setNewLabel("Superconductor");
                   }}
                 >
-                  Use
+                  填入
                 </Button>
               </div>
               <div className="flex items-center justify-between rounded-md bg-muted/50 p-3">
@@ -367,7 +361,7 @@ export default function SettingsPage() {
                   </code>
                 </div>
                 <Badge variant="secondary" className="text-xs">
-                  If compatible
+                  若格式兼容
                 </Badge>
               </div>
             </div>

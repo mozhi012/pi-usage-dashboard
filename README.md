@@ -1,36 +1,36 @@
-# Pi Usage Dashboard
+# Pi 用量仪表盘 (Pi Usage Dashboard)
 
-A web-based dashboard for tracking token usage, costs, sessions, and resources across all your [pi coding agent](https://github.com/badlogic/pi-mono) projects.
+一个基于 Web 的图形化仪表盘，用于追踪和统计 [pi 编程智能体 (pi coding agent)](https://github.com/badlogic/pi-mono) 在所有项目中的 Token 消耗、API 费用、会话记录和全局资源。
 
-![Dashboard](https://img.shields.io/badge/port-33123-blue) ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![License](https://img.shields.io/badge/license-MIT-green)
+![端口](https://img.shields.io/badge/port-33123-blue) ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![开源许可](https://img.shields.io/badge/license-MIT-green)
 
 <p align="center">
-  <img src="docs/preview.png" alt="Pi Usage Dashboard Preview" width="800" />
+  <img src="docs/preview.png" alt="Pi 用量仪表盘预览图" width="800" />
 </p>
 
-## Features
+## 功能特性
 
-- **Usage Tracking** — Total tokens, input/output breakdown, cache usage, and costs across all sessions
-- **Live Updates** — Real-time dashboard updates via Server-Sent Events when sessions change
-- **Multi-Source** — Merge sessions from multiple harnesses (pi default, Superconductor, custom paths)
-- **Model Pricing** — Configure per-model token prices to calculate costs from subscription providers
-- **Time Filters** — Daily, weekly, and monthly views with synchronized charts and summary cards
-- **Project Details** — Per-project usage breakdown with session list and terminal launch
-- **Session Actions** — Resume, fork, export to HTML, share via Gist, or duplicate sessions
-- **Models & Providers** — View all authenticated models, providers, and auth status
-- **Extensions & Skills** — Browse and manage installed extensions, skills, prompts, and themes
-- **Hotkeys Reference** — Complete keyboard shortcut reference with custom override display
-- **Cross-Platform** — Works on macOS, Linux, and Windows
-- **CLI** — `pi-usage start`, `pi-usage stop`, `pi-usage open` — manage from any terminal
+- **用量与费用统计** — 统计所有会话的总 Token 消耗、提示词输入/模型输出拆分、缓存读取/写入用量以及 API 花费。
+- **实时同步更新** — 基于 Server-Sent Events (SSE) 和文件变动监听，会话产生变化时仪表盘实时刷新。
+- **多数据源合并** — 支持合并多个运行环境的会话（Pi 默认路径、Superconductor、自定义路径等）。
+- **模型单约定价** — 支持按模型分别配置每 100 万 Token 的输入/输出/缓存单价，精准核算各提供商费用。
+- **多时间维度筛选** — 支持按天 (Daily)、按周 (Weekly)、按月 (Monthly) 筛选统计，图表与统计卡片联动。
+- **项目详情与会话列表** — 按项目拆分用量，支持查看各项目全部历史会话并直接在终端打开。
+- **会话操作** — 支持在终端中恢复会话 (Resume)、分叉会话 (Fork)、导出为 HTML、通过 Gist 分享或复制会话。
+- **模型与提供商管理** — 集中查看已认证的模型、服务提供商、认证状态，并支持添加自定义提供商与模型。
+- **扩展与技能管理** — 浏览并管理已安装的扩展 (Extensions)、技能 (Skills)、提示词模板 (Prompts) 和主题 (Themes)。
+- **快捷键速查** — 完整的 Pi 键盘快捷键参考列表，清晰标注默认快捷键与自定义覆盖项。
+- **跨平台兼容** — 完美支持 Windows、macOS 和 Linux。
+- **便捷 CLI 工具** — 提供全局命令 `pi-usage start`、`pi-usage stop`、`pi-usage open` 等，随时随地在终端掌控。
 
-## Quick Start
+## 快速上手
 
-### Prerequisites
+### 环境要求
 
 - [Node.js](https://nodejs.org/) 18+
-- [pi coding agent](https://github.com/badlogic/pi-mono) installed globally
+- 全局安装 [pi coding agent](https://github.com/badlogic/pi-mono)
 
-### Install
+### 安装步骤
 
 ```bash
 git clone https://github.com/mralifakbar/pi-usage-dashboard.git
@@ -40,229 +40,133 @@ npm run build
 npm link
 ```
 
-### Usage
+### CLI 命令行使用
 
-After `npm link`, the `pi-usage` command is available globally:
-
-```bash
-pi-usage start          # Start dashboard in background
-pi-usage stop           # Stop the dashboard
-pi-usage restart        # Restart the dashboard
-pi-usage status         # Check if running (shows PID and URL)
-pi-usage open           # Open in browser (auto-starts if needed)
-pi-usage update         # Pull latest + install + build + restart
-pi-usage dev            # Start in development mode (foreground, hot reload)
-pi-usage build          # Rebuild for production
-pi-usage port <number>  # Change the port (default: 33123)
-pi-usage logs           # Show last 50 lines of logs
-pi-usage help           # Show all commands
-```
-
-### Without CLI
-
-You can also run directly with npm:
+执行 `npm link` 之后，即可在全局终端使用 `pi-usage` 命令：
 
 ```bash
-npm run start           # Start on port 33123
-npm run dev             # Development mode
+pi-usage start          # 在后台启动仪表盘
+pi-usage stop           # 停止运行中的仪表盘
+pi-usage restart        # 重启仪表盘
+pi-usage status         # 检查运行状态（显示 PID 与访问 URL）
+pi-usage open           # 在浏览器中打开（未启动会自动启动）
+pi-usage update         # 拉取最新代码 + 安装依赖 + 重新构建 + 重启
+pi-usage dev            # 以开发模式在前台运行（支持热重载）
+pi-usage build          # 重新编译生产环境产物
+pi-usage port <端口号>  # 更改运行端口 (默认: 33123)
+pi-usage logs           # 查看最近 50 行日志
+pi-usage help           # 显示全部命令帮助
 ```
 
-Then open [http://localhost:33123](http://localhost:33123).
+### 不使用 CLI 直接运行
 
-## Configuration
+也可以直接通过 npm 脚本启动：
 
-### Session Sources
+```bash
+npm run start           # 生产模式启动（端口 33123）
+npm run dev             # 开发模式启动
+```
 
-The dashboard always reads from the default pi sessions directory (`~/.pi/agent/sessions/`).
+启动后在浏览器中访问：[http://localhost:33123](http://localhost:33123)。
 
-Add additional sources via the **Sources** page (`/settings`) in the dashboard UI:
+## 配置说明
+
+### 会话数据源 (Session Sources)
+
+仪表盘默认会自动读取 Pi 的标准会话存储目录（`~/.pi/agent/sessions/`）。
+
+若你使用了其他集成工具，可以在仪表盘界面的 **数据源 (Sources)** 页面（`/settings`）添加附加路径：
 
 - **Superconductor**: `~/.superconductor/sessions/pi/`
-- **Custom harnesses**: any directory containing `.jsonl` session files
-- **Team shared directories**: mounted network paths
+- **自定义封装 / 工具路径**: 例如 `/path/to/my/agent/sessions/`
 
-Sessions are deduplicated by session ID — the same session appearing in multiple sources is only counted once.
+仪表盘会自动递归扫描该目录下的 `.jsonl` 文件，并基于会话 ID 自动去重。
 
-### Model Pricing
+### 修改端口
 
-Configure per-model token prices via the **Pricing** page (`/pricing`).
-
-Prices are per 1 million tokens:
-
-| Field | Description |
-|-------|-------------|
-| Input Price | Cost per 1M input tokens |
-| Output Price | Cost per 1M output tokens |
-| Cache Read Price | Cost per 1M cache read tokens |
-| Cache Write Price | Cost per 1M cache write tokens |
-
-If no pricing is configured for a model, the provider-reported cost is used (usually $0 for subscription-based providers).
-
-### Port
-
-Default port is `33123`. Change it with the CLI:
+默认端口为 `33123`。你可以通过 CLI 随时修改：
 
 ```bash
 pi-usage port 8080
 pi-usage restart
 ```
 
-Or edit `package.json` scripts manually.
+或者手动修改 `package.json` 中的 scripts 脚本。
 
-## Pages
+## 页面路由
 
-| Route | Description |
-|-------|-------------|
-| `/` | Main dashboard — summary cards, time charts, model breakdown, projects, sessions |
-| `/models` | All authenticated models, providers, and auth status from `auth.json` |
-| `/hotkeys` | Pi keyboard shortcuts with default and custom bindings |
-| `/extensions` | Installed extensions, skills, prompts, and themes (with delete) |
-| `/settings` | Configure additional session source directories |
-| `/pricing` | Configure per-model token pricing |
-| `/project?path=...` | Project detail — stats, session list, resume/fork/terminal launch |
+| 路由 | 说明 |
+|------|------|
+| `/` | 仪表盘主页 — 统计卡片、时间趋势图、模型分布图、各项目明细、全部会话列表 |
+| `/models` | 模型与提供商管理 — 显示所有模型、提供商以及 `auth.json` 认证状态，支持添加自定义模型 |
+| `/hotkeys` | 快捷键参考 — 展示默认快捷键与自定义键位映射 |
+| `/extensions` | 扩展与技能 — 浏览已安装的扩展、技能、提示词模板与主题（支持删除操作） |
+| `/settings` | 数据源设置 — 配置附加的会话日志扫描目录 |
+| `/pricing` | 模型定价 — 为各模型配置每百万 Token 的单价，精准核算花费 |
+| `/project?path=...` | 项目详情 — 针对单个项目的用量明细、会话列表及一键在终端恢复会话 |
 
-## API Endpoints
+## API 接口
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/usage` | GET | Aggregated usage data from all sources |
-| `/api/usage/stream` | GET | Server-Sent Events stream for real-time updates |
-| `/api/pricing` | GET/POST/DELETE | Model pricing CRUD |
-| `/api/sources` | GET/POST/PUT/DELETE | Session source directory management |
-| `/api/models` | GET | Available models and providers (authenticated only) |
-| `/api/extensions` | GET/DELETE | Extensions, skills, prompts, themes |
-| `/api/hotkeys` | GET | Keyboard shortcuts with custom overrides |
-| `/api/terminal` | POST | Launch pi in a new terminal window (cross-platform) |
-| `/api/session-actions` | POST | Export, share, import, or duplicate sessions |
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/usage` | GET | 获取所有数据源聚合后的用量数据 |
+| `/api/usage/stream` | GET | SSE 实时数据流，文件发生变化时即时推送 |
+| `/api/pricing` | GET/POST/DELETE | 模型定价的增删改查 |
+| `/api/sources` | GET/POST/PUT/DELETE | 会话数据源目录管理 |
+| `/api/models` | GET | 获取可用模型与提供商（仅限已配置/已认证） |
+| `/api/extensions` | GET/DELETE | 获取及删除扩展、技能、提示词和主题 |
+| `/api/hotkeys` | GET | 获取键盘快捷键与自定义覆盖项 |
+| `/api/terminal` | POST | 在新终端窗口中唤起并打开 Pi（支持跨平台） |
+| `/api/session-actions` | POST | 会话的导出、分享或复制 |
 
-## Data Storage
+## 数据存储位置
 
-| File | Purpose |
-|------|---------|
-| `~/.pi/agent/usage-dashboard.db` | SQLite — pricing config and session sources |
-| `~/.pi/agent/usage-dashboard.pid` | PID file for background process |
-| `~/.pi/agent/usage-dashboard.log` | Dashboard server logs |
-| `~/.pi/agent/sessions/` | Default pi session files (read-only) |
-| `~/.pi/agent/auth.json` | OAuth/API credentials (read-only) |
-| `~/.pi/agent/models.json` | Custom provider configs (read-only) |
-| `~/.pi/agent/keybindings.json` | Custom keybindings (read-only) |
+| 文件 / 目录 | 作用说明 |
+|-------------|----------|
+| `~/.pi/agent/usage-dashboard.db` | SQLite 数据库 — 存储定价配置与数据源路径 |
+| `~/.pi/agent/usage-dashboard.pid` | 后台进程 PID 记录文件 |
+| `~/.pi/agent/usage-dashboard.log` | 仪表盘运行日志文件 |
+| `~/.pi/agent/sessions/` | 默认 Pi 会话存储目录（只读读取） |
+| `~/.pi/agent/auth.json` | OAuth 及 API 凭据配置（只读读取） |
+| `~/.pi/agent/models.json` | 自定义提供商与模型配置（读写） |
+| `~/.pi/agent/keybindings.json` | 自定义键盘快捷键配置（只读读取） |
 
-## How It Works
+## 工作原理
 
-### Session Parsing
+### 会话解析机制
 
-Pi stores sessions as JSONL files with a tree structure. Each assistant message contains a `usage` field with token counts. The dashboard:
+Pi 将会话以树状结构的 JSONL 文件保存。每条助手回复消息中都包含 `usage` 字段记录 Token 数量。仪表盘工作流程如下：
 
-1. Recursively scans all configured session directories for `.jsonl` files
-2. Parses each file, extracting assistant messages with usage data
-3. Applies custom pricing (if configured) to calculate costs
-4. Deduplicates by session ID across all sources
-5. Aggregates by model, project, day, week, and month
+1. 递归扫描所有已启用的会话源目录，查找所有 `.jsonl` 文件；
+2. 解析每个会话文件，提取包含用量数据的助手消息；
+3. 匹配对应的模型定价规则（若已配置），核算总费用；
+4. 跨所有数据源按会话 ID 自动去重；
+5. 按模型、项目、按天、按周以及按月进行多维度聚合统计。
 
-### Live Updates
+### 实时更新机制 (SSE)
 
-Uses Server-Sent Events (SSE) with [chokidar](https://github.com/paulmillr/chokidar) file watching:
+采用 Server-Sent Events (SSE) 搭配 [chokidar](https://github.com/paulmillr/chokidar) 进行文件系统监听：
 
-- Watches all enabled source directories for `.jsonl` file changes
-- Debounces updates (1s) to avoid flooding during active sessions
-- Auto-reconnects on connection loss (3s retry)
-- Heartbeat every 30s to keep connections alive
-- Click **Sync** to reconnect and pick up newly added sources
+- 实时监听所有启用的数据源目录中的 `.jsonl` 文件变动；
+- 设置 1 秒防抖（debounce），避免在会话进行中频繁刷新；
+- 连接断开时自动重试重连（3 秒重试间隔）；
+- 每 30 秒发送心跳包保持长连接活跃；
+- 在主界面点击“同步数据”可随时重新同步并加载新增数据源。
 
-### Compaction Safety
+### 压缩安全性 (Compaction Safety)
 
-Pi's compaction feature summarizes older messages but **never deletes** them from the JSONL file. All token usage is preserved and counted regardless of compaction state.
+Pi 内置的上下文压缩功能会对旧消息进行摘要归纳，但**绝不会从 JSONL 文件中删除原始消息**。因此，无论是否触发过压缩，所有历史 Token 消耗均会被完整保留并精确统计。
 
-### Cross-Platform Terminal
+### 跨平台终端唤起
 
-The terminal launch API detects the OS and uses the appropriate method:
+终端唤起 API 会自动识别操作系统并采用原生适配命令：
 
-| OS | Method |
-|----|--------|
-| macOS | `osascript` → Terminal.app |
-| Linux | `gnome-terminal`, `konsole`, `xterm`, or `x-terminal-emulator` |
+| 操作系统 | 唤起方式 |
+|----------|----------|
+| macOS | `osascript` → 唤起 Terminal.app |
+| Linux | `gnome-terminal`、`konsole`、`xterm` 或 `x-terminal-emulator` |
 | Windows | `start cmd /k` |
 
-## Contributing
+## 开源协议
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Install dependencies: `npm install`
-4. Start dev server: `pi-usage dev` or `npm run dev`
-5. Make your changes
-6. Run lint: `npm run lint`
-7. Build: `npm run build`
-8. Commit: `git commit -m "feat: description"`
-9. Push: `git push origin feature/my-feature`
-10. Open a Pull Request
-
-### Project Structure
-
-```
-pi-usage-dashboard/
-├── bin/
-│   └── pi-usage.mjs          # CLI entry point
-├── docs/
-│   └── preview.png            # README screenshot
-├── public/
-│   └── preview.png            # Served preview image
-├── src/
-│   ├── app/
-│   │   ├── api/               # API route handlers
-│   │   │   ├── extensions/    # Extensions/skills/prompts/themes CRUD
-│   │   │   ├── hotkeys/       # Keyboard shortcuts
-│   │   │   ├── models/        # Models and providers
-│   │   │   ├── pricing/       # Model pricing CRUD
-│   │   │   ├── session-actions/ # Export, share, duplicate
-│   │   │   ├── sources/       # Session source management
-│   │   │   ├── terminal/      # Terminal launch (cross-platform)
-│   │   │   └── usage/         # Usage data + SSE stream
-│   │   ├── extensions/        # Extensions page
-│   │   ├── hotkeys/           # Hotkeys page
-│   │   ├── models/            # Models page
-│   │   ├── pricing/           # Pricing page
-│   │   ├── project/           # Project detail page
-│   │   ├── settings/          # Session sources page
-│   │   ├── icon.svg           # Favicon
-│   │   ├── layout.tsx         # Root layout
-│   │   └── page.tsx           # Main dashboard
-│   ├── components/
-│   │   ├── ui/                # shadcn/ui base components
-│   │   ├── projects-table.tsx
-│   │   ├── sessions-table.tsx
-│   │   ├── summary-cards.tsx
-│   │   ├── tokens-by-day-chart.tsx
-│   │   └── tokens-by-model-chart.tsx
-│   ├── hooks/
-│   │   └── use-usage-stream.ts   # SSE hook for real-time data
-│   └── lib/
-│       ├── db.ts              # SQLite database (pricing + sources)
-│       ├── parse-sessions.ts  # Session JSONL parser + aggregator
-│       └── utils.ts           # Tailwind utilities
-├── package.json
-├── next.config.ts
-└── README.md
-```
-
-### Development Guidelines
-
-- All API routes must have JSDoc headers explaining the endpoint
-- Use `homedir()` for user paths — never hardcode directories
-- Terminal commands must be cross-platform (macOS/Linux/Windows)
-- Session sources are resolved dynamically — no hardcoded paths
-- Built-in model discovery uses `which pi` — works with any install method
-- The CLI (`bin/pi-usage.mjs`) must work as ESM with no build step
-
-## Tech Stack
-
-- [Next.js 16](https://nextjs.org/) — React framework with App Router
-- [shadcn/ui](https://ui.shadcn.com/) — UI components
-- [Recharts](https://recharts.org/) — Charts
-- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) — Local SQLite database
-- [chokidar](https://github.com/paulmillr/chokidar) — File watching for live updates
-- [Tailwind CSS 4](https://tailwindcss.com/) — Styling
-- [Lucide](https://lucide.dev/) — Icons
-
-## License
-
-MIT
+本项目基于 [MIT 协议](LICENSE) 开源。

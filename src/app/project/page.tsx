@@ -59,16 +59,16 @@ function timeAgo(timestamp: number): string {
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
 
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  if (hours < 24) return `${hours} 小时前`;
+  if (days < 7) return `${days} 天前`;
   return formatDate(timestamp);
 }
 
 export default function ProjectPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Loading...</p></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">加载中...</p></div>}>
       <ProjectContent />
     </Suspense>
   );
@@ -119,7 +119,7 @@ function ProjectContent() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setTerminalError(data.error || "Failed to launch terminal");
+        setTerminalError(data.error || "启动终端失败");
       }
     } catch (err) {
       setTerminalError(String(err));
@@ -129,7 +129,7 @@ function ProjectContent() {
   if (!project) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">No project specified</p>
+        <p className="text-muted-foreground">未指定项目路径</p>
       </div>
     );
   }
@@ -143,7 +143,7 @@ function ProjectContent() {
               <Link href="/">
                 <Button variant="ghost" size="sm" className="gap-1.5">
                   <ArrowLeft className="h-4 w-4" />
-                  Dashboard
+                  返回主面板
                 </Button>
               </Link>
               <div>
@@ -151,7 +151,7 @@ function ProjectContent() {
                   {project}
                 </h1>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  {sessions.length} sessions
+                  {sessions.length} 个会话
                 </p>
               </div>
             </div>
@@ -160,7 +160,7 @@ function ProjectContent() {
               className="gap-1.5"
             >
               <Terminal className="h-4 w-4" />
-              New Pi Session
+              新建 Pi 会话
             </Button>
           </div>
         </div>
@@ -174,7 +174,7 @@ function ProjectContent() {
               <CardContent className="pt-5 pb-4 px-5">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Total Tokens
+                    总 Token 数
                   </span>
                   <Zap className="h-4 w-4 text-chart-1" />
                 </div>
@@ -187,7 +187,7 @@ function ProjectContent() {
               <CardContent className="pt-5 pb-4 px-5">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Total Cost
+                    预估总费用
                   </span>
                   <DollarSign className="h-4 w-4 text-chart-5" />
                 </div>
@@ -200,7 +200,7 @@ function ProjectContent() {
               <CardContent className="pt-5 pb-4 px-5">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Sessions
+                    会话总数
                   </span>
                   <MessageSquare className="h-4 w-4 text-chart-2" />
                 </div>
@@ -213,7 +213,7 @@ function ProjectContent() {
               <CardContent className="pt-5 pb-4 px-5">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Turns
+                    总轮次
                   </span>
                   <Clock className="h-4 w-4 text-chart-4" />
                 </div>
@@ -235,20 +235,20 @@ function ProjectContent() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
-              Sessions
+              会话列表
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Last Active</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Models</TableHead>
-                  <TableHead className="text-right">Tokens</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
-                  <TableHead className="text-right">Turns</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>最近活跃</TableHead>
+                  <TableHead>创建时间</TableHead>
+                  <TableHead>模型</TableHead>
+                  <TableHead className="text-right">Token 用量</TableHead>
+                  <TableHead className="text-right">费用</TableHead>
+                  <TableHead className="text-right">轮次</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -299,7 +299,7 @@ function ProjectContent() {
                             handleOpenTerminal("resume", session.sessionId, session.sessionFile)
                           }
                         >
-                          Resume
+                          恢复
                         </Button>
                         <Button
                           variant="ghost"
@@ -309,7 +309,7 @@ function ProjectContent() {
                             handleOpenTerminal("fork", session.sessionId, session.sessionFile)
                           }
                         >
-                          Fork
+                          分叉
                         </Button>
                       </div>
                     </TableCell>

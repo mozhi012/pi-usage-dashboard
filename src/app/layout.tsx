@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pi Usage Dashboard",
-  description: "Token usage & cost tracking for pi coding agent",
+  title: "Pi 用量仪表盘",
+  description: "Pi 编程智能体的 Token 用量与费用追踪看板",
 };
 
 export default function RootLayout({
@@ -24,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="zh-CN"
       className={`${outfit.variable} ${geistMono.variable} dark h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">{children}</body>
