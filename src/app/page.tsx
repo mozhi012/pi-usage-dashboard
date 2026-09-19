@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import type { AggregatedData } from "@/lib/parse-sessions";
 import { UsageFilters } from "@/components/usage-filters";
 import {
   DEFAULT_USAGE_FILTERS,
@@ -35,11 +36,66 @@ import Link from "next/link";
 
 type TimeRange = "daily" | "weekly" | "monthly";
 
+/** Current pi model catalog (from /api/models), used to keep filter options in sync with pi's config. */
+interface ModelCatalogOptions {
+  providers: Set<string>;
+  modelIds: Set<string>;
+  modelsByProvider: Map<string, Set<string>>;
+}
+
+/** Usage-based filter options, restricted to providers/models still present in pi's config. */
+function computeFilterOptions(data: AggregatedData, provider: string, catalog: ModelCatalogOptions | null) {
+  const base = getFilterOptions(data, provider);
+  if (!catalog) return base;
+  const providers = base.providers.filter((p) => catalog.providers.has(p));
+  const allowed = provider ? catalog.modelsByProvider.get(provider) ?? null : catalog.modelIds;
+  const models = allowed ? base.models.filter((m) => allowed.has(m)) : base.models;
+  return { providers, models };
+}
+
 export default function Home() {
   const { data, status, lastUpdated, syncing, sync } = useUsageStream();
   const [timeRange, setTimeRange] = useState<TimeRange>("daily");
   const [filters, setFilters] = useState<FilterState>(DEFAULT_USAGE_FILTERS);
   const [clock, setClock] = useState(() => Date.now());
+  const [catalog, setCatalog] = useState<ModelCatalogOptions | null>(null);
+
+  // Fetch + parse the catalog without touching state (shared by mount effect and sync button).
+  const fetchCatalog = useCallback(async (): Promise<ModelCatalogOptions | null> => {
+    const res = await fetch("/api/models");
+    if (!res.ok) return null;
+    const json = await res.json();
+    const providers = new Set<string>(Object.keys(json.providers ?? {}));
+    const modelIds = new Set<string>();
+    const modelsByProvider = new Map<string, Set<string>>();
+    for (const m of json.models ?? []) {
+      modelIds.add(m.id);
+      let set = modelsByProvider.get(m.provider);
+      if (!set) {
+        set = new Set<string>();
+        modelsByProvider.set(m.provider, set);
+      }
+      set.add(m.id);
+    }
+    return { providers, modelIds, modelsByProvider };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCatalog()
+      .then((c) => { if (!cancelled && c) setCatalog(c); })
+      .catch((err) => console.error("Failed to load model catalog", err));
+    return () => { cancelled = true; };
+  }, [fetchCatalog]);
+
+  const loadCatalog = useCallback(() => {
+    fetchCatalog().then((c) => { if (c) setCatalog(c); }).catch((err) => console.error("Failed to load model catalog", err));
+  }, [fetchCatalog]);
+
+  const syncWithCatalog = useCallback(() => {
+    sync();
+    loadCatalog();
+  }, [sync, loadCatalog]);
 
   // Advance rolling windows even when no new usage arrives.
   useEffect(() => {
@@ -53,8 +109,8 @@ export default function Home() {
     [data, filters, now],
   );
   const options = useMemo(
-    () => data ? getFilterOptions(data, filters.provider) : { providers: [], models: [] },
-    [data, filters.provider],
+    () => data ? computeFilterOptions(data, filters.provider, catalog) : { providers: [], models: [] },
+    [data, filters.provider, catalog],
   );
   // Keep active selections visible if a live update removes their last message.
   const providers = filters.provider && !options.providers.includes(filters.provider)
@@ -65,7 +121,7 @@ export default function Home() {
 
   function changeFilters(next: FilterState) {
     if (data && next.provider !== filters.provider && next.model &&
-        !getFilterOptions(data, next.provider).models.includes(next.model)) {
+        !computeFilterOptions(data, next.provider, catalog).models.includes(next.model)) {
       next = { ...next, model: "" };
     }
     setClock(Date.now());
@@ -145,7 +201,7 @@ export default function Home() {
                 定价
               </Link>
               <button
-                onClick={sync}
+                onClick={syncWithCatalog}
                 disabled={syncing}
                 className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
               >

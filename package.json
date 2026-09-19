@@ -11,9 +11,9 @@
     "pi-usage": "./bin/pi-usage.mjs"
   },
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1 --port 33123",
+    "dev": "next dev --hostname 127.0.0.1 --port 33124",
     "build": "next build",
-    "start": "next start --hostname 127.0.0.1 --port 33123",
+    "start": "next start --hostname 127.0.0.1 --port 33124",
     "lint": "eslint",
     "test": "vitest run"
   },
