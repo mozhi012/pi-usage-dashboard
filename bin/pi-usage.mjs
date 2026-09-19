@@ -136,15 +136,13 @@ const commands = {
     mkdirSync(PID_DIR, { recursive: true });
 
     const logStream = openSync(LOG_FILE, "a");
-    const isWindows = platform() === "win32";
-    const nextBin = join(PROJECT_DIR, "node_modules", ".bin", isWindows ? "next.cmd" : "next");
+    const nextBin = join(PROJECT_DIR, "node_modules", "next", "dist", "bin", "next");
 
-    const child = spawn(isWindows ? nextBin : "node", isWindows ? ["start", "--port", String(port)] : [nextBin, "start", "--port", String(port)], {
+    const child = spawn(process.execPath, [nextBin, "start", "--port", String(port)], {
       cwd: PROJECT_DIR,
-      detached: !isWindows,
+      detached: true,
       stdio: ["ignore", logStream, logStream],
       env: { ...process.env, NODE_ENV: "production" },
-      shell: isWindows,
     });
 
     child.unref();
