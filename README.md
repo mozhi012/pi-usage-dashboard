@@ -27,7 +27,7 @@
 
 ### 环境要求
 
-- [Node.js](https://nodejs.org/) 18+
+- [Node.js](https://nodejs.org/) 20.19+（建议使用当前 LTS）
 - 全局安装 [pi coding agent](https://github.com/badlogic/pi-mono)
 
 ### 安装步骤
@@ -70,6 +70,18 @@ npm run dev             # 开发模式启动
 启动后在浏览器中访问：[http://localhost:33123](http://localhost:33123)。
 
 ## 配置说明
+
+### 供应商额度
+
+首页显示 OpenAI Codex 的短周期 / 周额度，以及 Antigravity 返回的各模型剩余比例和重置时间。模型列表可展开；比例不是 Token 或请求次数，模型间可能共享额度，不推测接口未返回的周额度。
+
+- 只读本机 `~/.pi/agent/auth.json` 中 `openai-codex`、`antigravity` 的 OAuth 登录态，不需要接入 9router。
+- 不刷新或修改登录凭据；过期时需在 Pi 中刷新登录，再点击“刷新额度”。凭据不会发给浏览器。
+- 自动刷新间隔 5 分钟，手动刷新最短间隔 15 秒；查询失败保留并标记上次成功数据。
+- 出站查询支持启动进程的 `HTTPS_PROXY`、`HTTP_PROXY`、`NO_PROXY` 环境变量。代理设置变化后需重启仪表盘。
+- 额度接口可能独立限流或拒绝访问，不代表模型调用不可用。
+
+接口语义参考 [9router Codex](https://github.com/decolua/9router/blob/master/open-sse/services/usage/codex.js) 与 [Antigravity](https://github.com/decolua/9router/blob/master/open-sse/services/usage/google.js)。
 
 ### 会话数据源 (Session Sources)
 

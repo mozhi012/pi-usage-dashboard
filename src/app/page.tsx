@@ -11,6 +11,7 @@ import {
 } from "@/lib/filter-usage";
 import { useUsageStream } from "@/hooks/use-usage-stream";
 import { SummaryCards } from "@/components/summary-cards";
+import { ProviderQuotas } from "@/components/provider-quotas";
 import { TokensByModelChart } from "@/components/tokens-by-model-chart";
 import { TokensByDayChart } from "@/components/tokens-by-day-chart";
 import { ProjectsTable } from "@/components/projects-table";
@@ -159,6 +160,7 @@ export default function Home() {
       </div>
 
       <main className="container mx-auto px-6 py-6 space-y-6">
+        <ProviderQuotas />
         {!filteredData ? (
           <div className="flex items-center justify-center h-64">
             <div className="flex items-center gap-3 text-muted-foreground">
