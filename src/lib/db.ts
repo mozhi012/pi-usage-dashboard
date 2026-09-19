@@ -130,15 +130,16 @@ export function deletePricing(model: string): void {
 
 /**
  * Load cost data embedded in model definitions from ~/.pi/agent/models.json.
- * Only returns entries for models that have a `cost` field with at least one
- * non-zero price. These act as automatic fallback pricing.
+ * Only returns entries for models that define a `cost` object with at least
+ * one numeric price. These act as automatic fallback pricing; an explicit
+ * all-zero cost is meaningful (self-hosted / free model) and is included.
  */
-function loadModelsJsonCosts(): ModelPricing[] {
-  const modelsJsonPath = join(homedir(), ".pi", "agent", "models.json");
-  if (!existsSync(modelsJsonPath)) return [];
+export function loadModelsJsonCosts(modelsJsonPath?: string): ModelPricing[] {
+  const modelsJson = modelsJsonPath ?? join(homedir(), ".pi", "agent", "models.json");
+  if (!existsSync(modelsJson)) return [];
 
   try {
-    const content = readFileSync(modelsJsonPath, "utf-8");
+    const content = readFileSync(modelsJson, "utf-8");
     const parsed = JSON.parse(content);
     const providers = parsed.providers || {};
     const result: ModelPricing[] = [];
@@ -153,9 +154,10 @@ function loadModelsJsonCosts(): ModelPricing[] {
       if (!cfg.models) continue;
 
       for (const model of cfg.models) {
-        if (!model.cost) continue;
         const c = model.cost;
-        if (!c.input && !c.output && !c.cacheRead && !c.cacheWrite) continue;
+        if (!c || typeof c !== "object") continue;
+        const numeric = [c.input, c.output, c.cacheRead, c.cacheWrite];
+        if (!numeric.some((v) => typeof v === "number" && Number.isFinite(v))) continue;
 
         result.push({
           model: model.id,
