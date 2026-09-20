@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { fetch as proxyFetch, EnvHttpProxyAgent } from "undici";
+import { resolveProxyOptions } from "./proxy";
 import type { ProviderQuota, QuotaProviderId, QuotaResponse, QuotaWindow, QuotaWindowMember } from "./quota-types";
 
 const NAMES = { "openai-codex": "OpenAI Codex", antigravity: "Antigravity" };
@@ -111,6 +112,12 @@ export function parseQuotas(id: QuotaProviderId, raw: unknown): QuotaWindow[] {
 
 type RequestQuota = (id: QuotaProviderId, auth: RecordValue) => Promise<{ status: number; data?: unknown }>;
 let dispatcher: EnvHttpProxyAgent | undefined;
+// EnvHttpProxyAgent reads only process env; resolveProxyOptions adds a PROXY_URL / .pi-proxy
+// fallback so quota lookups still work when the server was started without proxy vars.
+function getDispatcher(): EnvHttpProxyAgent {
+  dispatcher ??= new EnvHttpProxyAgent(resolveProxyOptions() ?? undefined);
+  return dispatcher;
+}
 const fetchAntigravity = async (auth: RecordValue, path: string): Promise<{ status: number; data?: unknown }> => {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${auth.access}`, Accept: "application/json", "Content-Type": "application/json",
@@ -122,7 +129,7 @@ const fetchAntigravity = async (auth: RecordValue, path: string): Promise<{ stat
     ? "https://daily-cloudcode-pa.googleapis.com"
     : "https://cloudcode-pa.googleapis.com";
   const response = await proxyFetch(`${baseUrl}/${path}`, {
-    dispatcher, method: "POST", headers,
+    dispatcher: getDispatcher(), method: "POST", headers,
     body: JSON.stringify(typeof auth.projectId === "string" ? { project: auth.projectId } : {}),
     signal: AbortSignal.timeout(15_000), redirect: "error", cache: "no-store",
   });
@@ -131,7 +138,6 @@ const fetchAntigravity = async (auth: RecordValue, path: string): Promise<{ stat
 };
 
 export const requestQuota: RequestQuota = async (id, auth) => {
-  dispatcher ??= new EnvHttpProxyAgent();
   if (id !== "openai-codex") {
     const response = await fetchAntigravity(auth, "v1internal:fetchAvailableModels");
     if (!response.data || response.status < 200 || response.status >= 300) return response;
@@ -149,7 +155,7 @@ export const requestQuota: RequestQuota = async (id, auth) => {
   const headers: Record<string, string> = { Authorization: `Bearer ${auth.access}`, Accept: "application/json" };
   if (typeof auth.accountId === "string") headers["ChatGPT-Account-Id"] = auth.accountId;
   const response = await proxyFetch("https://chatgpt.com/backend-api/wham/usage", {
-    dispatcher, method: "GET", headers,
+    dispatcher: getDispatcher(), method: "GET", headers,
     signal: AbortSignal.timeout(15_000), redirect: "error", cache: "no-store",
   });
   if (!response.ok) { await response.body?.cancel(); return { status: response.status }; }
